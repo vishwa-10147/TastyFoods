@@ -1239,6 +1239,9 @@ app.get(['/', '/index.html', '/client.html', '/restaurants.html', '/tastyfoods',
   res.sendFile(path.join(__dirname, 'tastyfoods.html'))
 );
 app.get('/tastyfoods.html', (_req, res) => res.sendFile(path.join(__dirname, 'tastyfoods.html')));
+app.get(['/admin', '/admin/', '/admin-dashboard', '/admin-dashboard/', '/admin-dashboard.html'], (_req, res) =>
+  res.sendFile(path.join(__dirname, 'admin-dashboard.html'))
+);
 app.use('/tastyfoods', express.static(path.join(__dirname, 'tastyfoods')));
 
 app.use(express.static(__dirname));
@@ -1251,7 +1254,7 @@ app.get(['/r/:code', '/:code'], async (req, res, next) => {
 
     // reserved paths that should continue to static or other routes
     const reserved = new Set([
-      'api', 'client.html', 'management', 'management.html', 'restaurants.html', 'index.html', 'outer-screen.html', 'display', 'data', '_redirects', 'favicon.ico', 'tastyfoods'
+      'api', 'admin', 'admin-dashboard', 'admin-dashboard.html', 'client.html', 'management', 'management.html', 'restaurants.html', 'index.html', 'outer-screen.html', 'display', 'data', '_redirects', 'favicon.ico', 'tastyfoods'
     ]);
     if (reserved.has(maybe.toLowerCase())) return next();
 
