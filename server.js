@@ -1204,8 +1204,8 @@ async function redirectToRestaurantForHost(req, res) {
   if (mappedCode) {
     const restaurant = await resolveRestaurantByCode(mappedCode);
     if (restaurant) {
-      // Serve client.html directly for custom domain roots! No redirect to /code needed.
-      return res.sendFile(path.join(__dirname, 'client.html'));
+      // Serve the TastyFoods storefront directly for custom domain roots. No redirect to /code needed.
+      return res.sendFile(path.join(__dirname, 'tastyfoods.html'));
     }
   }
 
@@ -1270,8 +1270,8 @@ app.get(['/r/:code', '/:code'], async (req, res, next) => {
       return res.redirect(`${protocol}://${preferredCustomDomain}/`);
     }
 
-    // serve the existing client page so the URL remains pretty (no redirect)
-    return res.sendFile(path.join(__dirname, 'client.html'));
+    // Serve the TastyFoods storefront so pretty restaurant URLs keep the same UI after refresh.
+    return res.sendFile(path.join(__dirname, 'tastyfoods.html'));
   } catch (err) {
     return next();
   }
