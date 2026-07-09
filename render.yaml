@@ -8,9 +8,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "10000"
       - key: DATABASE_URL
         sync: false
       - key: PGSSL
+        sync: false
+      - key: REQUIRE_PERSISTENT_DB
         sync: false
       - key: MANAGEMENT_AUTH_SECRET
         sync: false

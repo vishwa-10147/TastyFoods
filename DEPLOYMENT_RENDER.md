@@ -18,8 +18,10 @@
 Set these in Render > Environment:
 
 - NODE_ENV=production
+- PORT=10000
 - DATABASE_URL=your_postgres_connection_string
 - PGSSL=true
+- REQUIRE_PERSISTENT_DB=true
 - MANAGEMENT_AUTH_SECRET=generate_a_long_random_string
 - MANAGEMENT_SETUP_KEY=choose_a_secret_setup_key
 - MANAGEMENT_DEFAULT_PASSWORD=optional_default_password
@@ -39,21 +41,23 @@ Important:
 - The first startup creates the needed tables automatically.
 
 ## 5. Custom domain
-If you have a separate domain:
-1. In Render, add your custom domain under the service settings.
-2. Update your DNS records to point to Render.
-3. If you want per-restaurant domain routing, set RESTAURANT_DOMAIN_MAP like this:
+If you have a separate domain like `tastytables.in`:
+1. In Render, add `tastytables.in` as a custom domain on your web service.
+2. Update Hostinger DNS to point that domain to Render.
+3. If you want a subdomain for a restaurant, set `RESTAURANT_DOMAIN_MAP` like this:
 
 Example:
-- RESTAURANT_DOMAIN_MAP=food.example.com:gandikotadosa,shop.example.com:anotherrestaurant
+- RESTAURANT_DOMAIN_MAP=food.tastytables.in:gandikotadosa,shop.tastytables.in:anotherrestaurant
 
 This maps a host to a restaurant code.
 
+> Because the app now redirects `/` to `/tastyfoods`, the public storefront will be served at `https://tastytables.in/tastyfoods/`.
+
 ## 6. Important URLs after deployment
-- Public storefront: https://your-render-url/tastyfoods
-- Admin panel: https://your-render-url/management.html
-- Admin dashboard: https://your-render-url/admin-dashboard.html
-- Health check: https://your-render-url/api/health
+- Public storefront: https://tastytables.in/tastyfoods/
+- Admin panel: https://tastytables.in/management.html
+- Admin dashboard: https://tastytables.in/admin-dashboard.html
+- Health check: https://tastytables.in/api/health
 
 ## 7. Recommended first login
 - Register a restaurant through the admin flow.
