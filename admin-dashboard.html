@@ -3,124 +3,926 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TastyFoods Admin Dashboard</title>
+  <title>TastyFoods Admin</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #fffaf6;
-      --panel: #ffffff;
-      --border: #f1d8c4;
-      --text: #111827;
-      --muted: #64748b;
-      --accent: #f97316;
-      --accent-dark: #ea580c;
+      --bg: #f7f4ef;
+      --surface: #ffffff;
+      --surface-2: #fbfaf7;
+      --line: #e4ddd3;
+      --line-strong: #cfc5b8;
+      --text: #181411;
+      --muted: #71685f;
+      --muted-2: #948a80;
+      --accent: #d95f36;
+      --accent-dark: #b74825;
+      --green: #25714f;
+      --green-soft: #e8f4ee;
+      --blue: #2563a8;
+      --blue-soft: #e8f0fb;
+      --red: #c83737;
+      --red-soft: #fdecec;
+      --gold: #a06a1b;
+      --gold-soft: #fff4dc;
+      --shadow: 0 18px 48px rgba(40, 32, 25, 0.10);
+      --radius: 8px;
     }
+
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(135deg, #fffaf6 0%, #fff3e7 100%);
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
       color: var(--text);
     }
-    .wrap {
-      max-width: 1160px;
-      margin: 0 auto;
-      padding: 32px 20px 56px;
+    button, input, select {
+      font: inherit;
     }
-    .hero {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 28px;
-      box-shadow: 0 20px 45px rgba(249, 115, 22, 0.12);
+    button {
+      border: 0;
+      cursor: pointer;
     }
-    .hero h1 { font-size: 2rem; margin: 0 0 10px; }
-    .hero p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.6; }
-    .grid {
+    .hidden { display: none !important; }
+
+    .login-shell {
+      min-height: 100vh;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      place-items: center;
+      padding: 24px;
+    }
+    .login-card {
+      width: min(960px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .login-copy {
+      padding: 34px;
+      background: #171310;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 420px;
+    }
+    .brand {
+      font-weight: 900;
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+    .brand span { color: #f0793e; }
+    .login-copy h1 {
+      margin: 54px 0 12px;
+      font-size: 34px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+    .login-copy p {
+      margin: 0;
+      color: rgba(255,255,255,.72);
+      line-height: 1.55;
+    }
+    .login-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 28px;
+    }
+    .login-meta span {
+      border: 1px solid rgba(255,255,255,.16);
+      color: rgba(255,255,255,.78);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .login-form {
+      padding: 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+    .form-title {
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+    .field-label {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-top: 6px;
+    }
+    .input {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--text);
+      border-radius: var(--radius);
+      min-height: 46px;
+      padding: 0 13px;
+      outline: none;
+    }
+    .input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(217, 95, 54, .14);
+      background: #fff;
+    }
+    .primary-btn {
+      background: var(--accent);
+      color: #fff;
+      min-height: 46px;
+      border-radius: var(--radius);
+      font-weight: 900;
+      margin-top: 10px;
+    }
+    .primary-btn:hover { background: var(--accent-dark); }
+    .ghost-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      font-weight: 850;
+    }
+    .ghost-btn:hover { border-color: var(--line-strong); }
+    .danger-text {
+      min-height: 18px;
+      color: var(--red);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+    }
+    .sidebar {
+      background: #171310;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid rgba(255,255,255,.08);
+    }
+    .side-head {
+      padding: 24px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .side-sub {
+      margin-top: 6px;
+      color: rgba(255,255,255,.54);
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .side-tools {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .side-tools input {
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.12);
+      color: #fff;
+    }
+    .side-tools input::placeholder { color: rgba(255,255,255,.46); }
+    .restaurant-list {
+      overflow: auto;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      flex: 1;
+      align-content: start;
+    }
+    .restaurant-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 13px;
+    }
+    .restaurant-btn.active {
+      border-color: rgba(240,121,62,.7);
+      background: rgba(217,95,54,.22);
+    }
+    .restaurant-name {
+      font-weight: 900;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .restaurant-meta {
+      color: rgba(255,255,255,.58);
+      font-size: 12px;
+      margin-top: 5px;
+      line-height: 1.35;
+    }
+    .status-pill {
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .status-open { background: var(--green-soft); color: var(--green); }
+    .status-closed { background: var(--red-soft); color: var(--red); }
+    .side-foot {
+      padding: 14px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .side-foot .ghost-btn {
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      border-color: rgba(255,255,255,.12);
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      height: 74px;
+      background: rgba(247,244,239,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       gap: 16px;
-      margin-top: 20px;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 4;
     }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 20px;
+    .title-block h2 {
+      margin: 0;
+      font-size: 23px;
+      line-height: 1.1;
+      letter-spacing: 0;
     }
-    .card h2 { margin: 0 0 8px; font-size: 1.05rem; }
-    .card p { margin: 0 0 14px; color: var(--muted); line-height: 1.5; font-size: 0.95rem; }
-    .card a, .card button {
+    .title-block p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .content {
+      padding: 22px 24px 40px;
+      display: grid;
+      gap: 18px;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 12px;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      min-width: 0;
+    }
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .metric-value {
+      margin-top: 8px;
+      font-size: 27px;
+      font-weight: 950;
+    }
+    .metric-sub {
+      margin-top: 4px;
+      color: var(--muted-2);
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .panel-head {
+      min-height: 58px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .filters .input {
+      min-height: 38px;
+      width: 220px;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+      overflow-x: auto;
+    }
+    .tab {
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .tab.active {
+      background: #fff;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .tab-body {
+      padding: 14px;
+      min-height: 280px;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 860px;
+      background: #fff;
+    }
+    th, td {
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      font-size: 13px;
+    }
+    th {
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .muted { color: var(--muted); }
+    .strong { font-weight: 900; }
+    .chip {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-      padding: 10px 14px;
       border-radius: 999px;
-      background: var(--accent);
-      color: white;
-      font-weight: 700;
-      transition: background 0.2s ease;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 900;
+      background: var(--blue-soft);
+      color: var(--blue);
+      white-space: nowrap;
     }
-    .card a:hover { background: var(--accent-dark); }
-    .note {
-      margin-top: 20px;
+    .chip.green { background: var(--green-soft); color: var(--green); }
+    .chip.red { background: var(--red-soft); color: var(--red); }
+    .chip.gold { background: var(--gold-soft); color: var(--gold); }
+    .menu-grid, .picture-grid, .customer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+    }
+    .item-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
       background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px 20px;
-      color: var(--muted);
-      line-height: 1.6;
+      overflow: hidden;
     }
-    .pill {
-      display: inline-block;
-      margin-right: 8px;
-      margin-bottom: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #fff3e7;
-      color: var(--accent-dark);
-      font-weight: 700;
-      font-size: 0.85rem;
+    .item-image {
+      height: 142px;
+      background: var(--surface-2);
+      display: grid;
+      place-items: center;
+      color: var(--muted-2);
+      font-weight: 900;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .item-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .item-body { padding: 12px; }
+    .item-title {
+      font-size: 14px;
+      font-weight: 950;
+      line-height: 1.25;
+      margin-bottom: 6px;
+    }
+    .item-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .empty {
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 750;
+      background: var(--surface-2);
+    }
+    .loading-bar {
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--blue), var(--green));
+      animation: load 1s linear infinite;
+      transform-origin: left;
+    }
+    @keyframes load {
+      0% { transform: scaleX(.15); opacity: .5; }
+      50% { transform: scaleX(.78); opacity: 1; }
+      100% { transform: scaleX(.15); opacity: .5; }
+    }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { min-height: auto; max-height: 420px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .login-card { grid-template-columns: 1fr; }
+      .login-copy { min-height: auto; }
+    }
+    @media (max-width: 640px) {
+      .topbar { height: auto; align-items: flex-start; flex-direction: column; padding: 16px; }
+      .content { padding: 16px; }
+      .metrics { grid-template-columns: 1fr; }
+      .filters { justify-content: stretch; }
+      .filters .input, .filters select { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
-      <h1>TastyFoods Admin Dashboard</h1>
-      <p>Use this area to manage restaurant access, menu updates, images, and order flow for your food court.</p>
-      <div style="margin-top: 14px;">
-        <span class="pill">Restaurant registration</span>
-        <span class="pill">Menu updates</span>
-        <span class="pill">Image uploads</span>
-        <span class="pill">Order status</span>
+  <section class="login-shell" id="login-shell">
+    <div class="login-card">
+      <div class="login-copy">
+        <div>
+          <div class="brand">Tasty<span>Foods</span></div>
+          <h1>Admin control room</h1>
+          <p>Monitor every restaurant from one place, with orders, menu photos, and customer details grouped by outlet.</p>
+          <div class="login-meta">
+            <span>All restaurants</span>
+            <span>Orders</span>
+            <span>Menu</span>
+            <span>Customers</span>
+          </div>
+        </div>
+        <p>Use the global admin credentials configured in Render.</p>
       </div>
-    </section>
-
-    <div class="grid">
-      <div class="card">
-        <h2>Management Console</h2>
-        <p>Open the full restaurant owner panel to manage menus, images, and outlet status.</p>
-        <a href="/management.html">Open Admin Panel</a>
-      </div>
-      <div class="card">
-        <h2>Customer Storefront</h2>
-        <p>Preview the public TastyFoods ordering experience for customers.</p>
-        <a href="/tastyfoods">Open Store</a>
-      </div>
-      <div class="card">
-        <h2>Custom Domain Setup</h2>
-        <p>Point your domain to this Render service and route restaurant traffic through the backend.</p>
-        <a href="/DEPLOYMENT_RENDER.md">View Render Guide</a>
-      </div>
+      <form class="login-form" id="login-form">
+        <div class="form-title">Admin login</div>
+        <label class="field-label" for="restaurant">Restaurant</label>
+        <input class="input" id="restaurant" value="admin" autocomplete="username" />
+        <label class="field-label" for="username">Username</label>
+        <input class="input" id="username" value="admin" autocomplete="username" />
+        <label class="field-label" for="password">Password</label>
+        <input class="input" id="password" type="password" autocomplete="current-password" />
+        <button class="primary-btn" type="submit">Sign in</button>
+        <div class="danger-text" id="login-error"></div>
+      </form>
     </div>
+  </section>
 
-    <div class="note">
-      <strong>Tip:</strong> If you are using a custom domain, set your DNS to point to the Render service, then add the domain and restaurant mapping values in the Render environment variables. The app already supports restaurant-based routing and public restaurant discovery.
-    </div>
-  </div>
+  <section class="app hidden" id="app">
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="brand">Tasty<span>Foods</span></div>
+        <div class="side-sub">Admin dashboard</div>
+      </div>
+      <div class="side-tools">
+        <input class="input" id="restaurant-search" placeholder="Search restaurants" />
+        <select class="input" id="restaurant-status-filter">
+          <option value="all">All status</option>
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <div class="restaurant-list" id="restaurant-list"></div>
+      <div class="side-foot">
+        <button class="ghost-btn" id="refresh-btn">Refresh</button>
+        <button class="ghost-btn" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="title-block">
+          <h2 id="page-title">All Restaurants</h2>
+          <p id="page-subtitle">Loading restaurant data</p>
+        </div>
+        <div class="top-actions">
+          <a class="ghost-btn" href="/management.html" style="text-decoration:none;">Management login</a>
+          <a class="ghost-btn" href="/tastyfoods" style="text-decoration:none;">Storefront</a>
+        </div>
+      </div>
+      <div id="loading" class="loading-bar hidden"></div>
+
+      <div class="content">
+        <section class="metrics">
+          <div class="metric"><div class="metric-label">Restaurants</div><div class="metric-value" id="m-restaurants">0</div><div class="metric-sub" id="m-open">0 open</div></div>
+          <div class="metric"><div class="metric-label">Orders</div><div class="metric-value" id="m-orders">0</div><div class="metric-sub" id="m-active">0 active</div></div>
+          <div class="metric"><div class="metric-label">Revenue</div><div class="metric-value" id="m-revenue">Rs 0</div><div class="metric-sub">Paid orders</div></div>
+          <div class="metric"><div class="metric-label">Customers</div><div class="metric-value" id="m-customers">0</div><div class="metric-sub">Known contacts</div></div>
+          <div class="metric"><div class="metric-label">Menu Items</div><div class="metric-value" id="m-menu">0</div><div class="metric-sub" id="m-pictures">0 pictures</div></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title" id="detail-title">Restaurant details</div>
+            <div class="filters">
+              <input class="input" id="detail-search" placeholder="Search current tab" />
+              <select class="input" id="order-status-filter">
+                <option value="all">All orders</option>
+                <option value="new">New</option>
+                <option value="preparing">Preparing</option>
+                <option value="ready">Ready</option>
+                <option value="delivered">Delivered</option>
+              </select>
+            </div>
+          </div>
+          <div class="tabs">
+            <button class="tab active" data-tab="orders">Orders</button>
+            <button class="tab" data-tab="menu">Menu</button>
+            <button class="tab" data-tab="pictures">Pictures</button>
+            <button class="tab" data-tab="customers">Customers</button>
+          </div>
+          <div class="tab-body" id="tab-body"></div>
+        </section>
+      </div>
+    </main>
+  </section>
+
+  <script>
+    const TOKEN_KEY = 'tf_admin_auth';
+    let auth = null;
+    let overview = { restaurants: [], orders: [] };
+    let selectedRestaurantId = null;
+    let detail = null;
+    let activeTab = 'orders';
+
+    const $ = (id) => document.getElementById(id);
+    const money = (v) => `Rs ${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const dateTime = (ms) => ms ? new Date(Number(ms)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+
+    function setLoading(on) {
+      $('loading')?.classList.toggle('hidden', !on);
+    }
+
+    async function api(path, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (auth?.token) headers.Authorization = `Bearer ${auth.token}`;
+      const res = await fetch(path, { ...options, headers });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) {
+        if (path !== '/api/management/login') logout('Session expired. Sign in again.');
+      }
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      $('login-error').textContent = '';
+      try {
+        const body = {
+          restaurant: $('restaurant').value.trim() || 'admin',
+          username: $('username').value.trim() || 'admin',
+          password: $('password').value
+        };
+        const data = await api('/api/management/login', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+        if (data.role !== 'admin' && data.isAdmin !== true) throw new Error('This dashboard requires an admin account');
+        auth = { token: data.token, username: data.username || body.username, role: data.role, isAdmin: true };
+        localStorage.setItem(TOKEN_KEY, JSON.stringify(auth));
+        $('password').value = '';
+        showApp();
+        await loadOverview();
+      } catch (error) {
+        $('login-error').textContent = error.message || 'Login failed';
+      }
+    }
+
+    function showApp() {
+      $('login-shell').classList.add('hidden');
+      $('app').classList.remove('hidden');
+    }
+
+    function showLogin(message = '') {
+      $('app').classList.add('hidden');
+      $('login-shell').classList.remove('hidden');
+      $('login-error').textContent = message;
+    }
+
+    function logout(message = '') {
+      auth = null;
+      localStorage.removeItem(TOKEN_KEY);
+      overview = { restaurants: [], orders: [] };
+      detail = null;
+      selectedRestaurantId = null;
+      showLogin(message);
+    }
+
+    async function loadOverview() {
+      setLoading(true);
+      try {
+        const data = await api('/api/management/state');
+        overview = {
+          restaurants: Array.isArray(data.restaurants) ? data.restaurants : [],
+          orders: Array.isArray(data.orders) ? data.orders : []
+        };
+        renderRestaurants();
+        if (!selectedRestaurantId && overview.restaurants[0]) selectedRestaurantId = overview.restaurants[0].id;
+        if (selectedRestaurantId) await selectRestaurant(selectedRestaurantId);
+        else renderEmpty('No restaurants found.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function selectRestaurant(id) {
+      selectedRestaurantId = Number(id);
+      renderRestaurants();
+      setLoading(true);
+      try {
+        detail = await api(`/api/management/admin/restaurants/${selectedRestaurantId}`);
+        renderHeader();
+        renderMetrics();
+        renderTab();
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function filteredRestaurants() {
+      const q = $('restaurant-search').value.trim().toLowerCase();
+      const status = $('restaurant-status-filter').value;
+      return overview.restaurants.filter((restaurant) => {
+        const haystack = `${restaurant.name || ''} ${restaurant.code || ''} ${restaurant.cuisines || ''} ${restaurant.address || ''}`.toLowerCase();
+        const matchSearch = !q || haystack.includes(q);
+        const isOpen = restaurant.acceptingOrders !== false;
+        const matchStatus = status === 'all' || (status === 'open' && isOpen) || (status === 'closed' && !isOpen);
+        return matchSearch && matchStatus;
+      });
+    }
+
+    function renderRestaurants() {
+      const list = $('restaurant-list');
+      const restaurants = filteredRestaurants();
+      if (!restaurants.length) {
+        list.innerHTML = '<div class="empty">No matching restaurants.</div>';
+        return;
+      }
+      list.innerHTML = restaurants.map((restaurant) => {
+        const active = Number(restaurant.id) === Number(selectedRestaurantId);
+        const open = restaurant.acceptingOrders !== false;
+        return `
+          <button class="restaurant-btn ${active ? 'active' : ''}" onclick="selectRestaurant(${Number(restaurant.id)})">
+            <div class="restaurant-name">
+              <span>${esc(restaurant.name || restaurant.code)}</span>
+              <span class="status-pill ${open ? 'status-open' : 'status-closed'}">${open ? 'Open' : 'Closed'}</span>
+            </div>
+            <div class="restaurant-meta">${esc(restaurant.code || '')}</div>
+            <div class="restaurant-meta">${esc(restaurant.address || 'Address not set')}</div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderHeader() {
+      const restaurant = detail?.restaurant || {};
+      $('page-title').textContent = restaurant.name || 'Restaurant';
+      $('page-subtitle').textContent = `${restaurant.code || '-'} · ${restaurant.address || 'Address not set'} · ${restaurant.cuisines || 'Cuisine not set'}`;
+      $('detail-title').textContent = `${restaurant.name || 'Restaurant'} details`;
+    }
+
+    function renderMetrics() {
+      const restaurants = overview.restaurants;
+      const orders = detail?.orders || [];
+      const paidOrders = orders.filter((order) => Number(order.paid) === 1);
+      const active = paidOrders.filter((order) => order.status !== 'delivered').length;
+      const customers = detail?.customers || [];
+      const menu = detail?.menu || [];
+      const pictures = detail?.pictures || [];
+      $('m-restaurants').textContent = restaurants.length;
+      $('m-open').textContent = `${restaurants.filter((restaurant) => restaurant.acceptingOrders !== false).length} open`;
+      $('m-orders').textContent = orders.length;
+      $('m-active').textContent = `${active} active`;
+      $('m-revenue').textContent = money(paidOrders.reduce((sum, order) => sum + Number(order.total || 0), 0));
+      $('m-customers').textContent = customers.length;
+      $('m-menu').textContent = menu.length;
+      $('m-pictures').textContent = `${pictures.length} pictures`;
+    }
+
+    function searchText() {
+      return $('detail-search').value.trim().toLowerCase();
+    }
+
+    function renderTab() {
+      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === activeTab));
+      $('order-status-filter').style.display = activeTab === 'orders' ? '' : 'none';
+      if (!detail) return renderEmpty('Select a restaurant.');
+      if (activeTab === 'orders') return renderOrders();
+      if (activeTab === 'menu') return renderMenu();
+      if (activeTab === 'pictures') return renderPictures();
+      if (activeTab === 'customers') return renderCustomers();
+    }
+
+    function renderEmpty(message) {
+      $('tab-body').innerHTML = `<div class="empty">${esc(message)}</div>`;
+    }
+
+    function renderOrders() {
+      const q = searchText();
+      const status = $('order-status-filter').value;
+      const orders = (detail.orders || []).filter((order) => {
+        const orderStatus = String(order.status || '').toLowerCase();
+        const matchStatus = status === 'all' || orderStatus === status;
+        const haystack = [
+          order.label, order.status, order.orderType, order.customerName, order.customerMobile,
+          order.deliveryName, order.deliveryMobile, order.notes,
+          ...(order.items || []).map((item) => item.name)
+        ].join(' ').toLowerCase();
+        return matchStatus && (!q || haystack.includes(q));
+      });
+      if (!orders.length) return renderEmpty('No orders match the current filters.');
+      $('tab-body').innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Items</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>Delivery</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${orders.map((order) => `
+                <tr>
+                  <td><div class="strong">${esc(order.label || `#${order.id}`)}</div><div class="muted">${esc(order.orderType || '-')} ${order.tableNumber ? `· T${order.tableNumber}` : ''}</div></td>
+                  <td><div class="strong">${esc(order.customerName || order.deliveryName || 'Guest')}</div><div class="muted">${esc(order.customerMobile || order.deliveryMobile || '-')}</div></td>
+                  <td>${(order.items || []).map((item) => `<div>${esc(item.name)} x ${Number(item.qty || 0)}</div>`).join('') || '-'}</td>
+                  <td><span class="chip ${order.status === 'delivered' ? 'green' : order.status === 'new' ? 'gold' : ''}">${esc(order.status || '-')}</span></td>
+                  <td><div class="strong">${money(order.total)}</div><div class="muted">${Number(order.paid) === 1 ? `Paid ${esc(order.paymentMethod || '')}` : 'Pending'}</div></td>
+                  <td>${order.orderType === 'delivery' ? `<div>${esc(order.deliveryName || '-')}</div><div class="muted">${esc(order.deliveryMobile || '-')}</div>${order.deliveryLat && order.deliveryLng ? `<a href="https://maps.google.com/?q=${Number(order.deliveryLat)},${Number(order.deliveryLng)}" target="_blank">Map</a>` : ''}` : '<span class="muted">Not delivery</span>'}</td>
+                  <td><div>${dateTime(order.createdAt)}</div><div class="muted">${esc(order.source || 'direct')}</div></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderMenu() {
+      const q = searchText();
+      const items = (detail.menu || []).filter((item) => {
+        const haystack = `${item.name || ''} ${item.desc || ''} ${item.description || ''} ${item.cat || ''}`.toLowerCase();
+        return !q || haystack.includes(q);
+      });
+      if (!items.length) return renderEmpty('No menu items match the current search.');
+      $('tab-body').innerHTML = `<div class="menu-grid">${items.map((item) => `
+        <article class="item-card">
+          <div class="item-image">${item.imageUrl ? `<img src="${esc(item.imageUrl)}" alt="${esc(item.name)}">` : 'No image'}</div>
+          <div class="item-body">
+            <div class="item-title">${esc(item.name)}</div>
+            <div class="item-meta">${esc(item.desc || item.description || 'No description')}</div>
+            <div style="margin-top:10px;display:flex;justify-content:space-between;gap:8px;align-items:center;">
+              <span class="chip">${esc(item.cat || 'Item')}</span>
+              <span class="strong">${money(item.price)}</span>
+            </div>
+            <div style="margin-top:8px;"><span class="chip ${Number(item.available) === 1 ? 'green' : 'red'}">${Number(item.available) === 1 ? 'Available' : 'Unavailable'}</span></div>
+          </div>
+        </article>
+      `).join('')}</div>`;
+    }
+
+    function renderPictures() {
+      const q = searchText();
+      const pictures = (detail.pictures || []).filter((pic) => {
+        const haystack = `${pic.name || ''} ${pic.type || ''}`.toLowerCase();
+        return !q || haystack.includes(q);
+      });
+      if (!pictures.length) return renderEmpty('No pictures uploaded for this restaurant.');
+      $('tab-body').innerHTML = `<div class="picture-grid">${pictures.map((pic) => `
+        <article class="item-card">
+          <div class="item-image"><img src="${esc(pic.imageUrl)}" alt="${esc(pic.name)}"></div>
+          <div class="item-body">
+            <div class="item-title">${esc(pic.name)}</div>
+            <div class="item-meta">${esc(pic.type === 'restaurant' ? 'Restaurant image' : 'Menu item image')}</div>
+          </div>
+        </article>
+      `).join('')}</div>`;
+    }
+
+    function renderCustomers() {
+      const q = searchText();
+      const customers = (detail.customers || []).filter((customer) => {
+        const haystack = `${customer.name || ''} ${customer.mobile || ''} ${customer.deliveryName || ''} ${customer.deliveryMobile || ''}`.toLowerCase();
+        return !q || haystack.includes(q);
+      });
+      if (!customers.length) return renderEmpty('No customer details found for this restaurant.');
+      $('tab-body').innerHTML = `<div class="customer-grid">${customers.map((customer) => `
+        <article class="item-card">
+          <div class="item-body">
+            <div class="item-title">${esc(customer.name || 'Guest')}</div>
+            <div class="item-meta">Mobile: ${esc(customer.mobile || customer.deliveryMobile || '-')}</div>
+            <div class="item-meta">Orders: ${Number(customer.orders || 0)}</div>
+            <div class="item-meta">Total spent: ${money(customer.totalSpent)}</div>
+            <div class="item-meta">Last order: ${dateTime(customer.lastOrderAt)}</div>
+            ${customer.deliveryLat && customer.deliveryLng ? `<div style="margin-top:10px;"><a class="ghost-btn" href="https://maps.google.com/?q=${Number(customer.deliveryLat)},${Number(customer.deliveryLng)}" target="_blank" style="text-decoration:none;display:inline-flex;">Open map</a></div>` : ''}
+          </div>
+        </article>
+      `).join('')}</div>`;
+    }
+
+    $('login-form').addEventListener('submit', login);
+    $('restaurant-search').addEventListener('input', renderRestaurants);
+    $('restaurant-status-filter').addEventListener('change', renderRestaurants);
+    $('detail-search').addEventListener('input', renderTab);
+    $('order-status-filter').addEventListener('change', renderTab);
+    $('refresh-btn').addEventListener('click', loadOverview);
+    $('logout-btn').addEventListener('click', () => logout('Logged out.'));
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        activeTab = tab.dataset.tab;
+        renderTab();
+      });
+    });
+
+    (async function init() {
+      try {
+        const saved = localStorage.getItem(TOKEN_KEY);
+        auth = saved ? JSON.parse(saved) : null;
+      } catch {
+        auth = null;
+      }
+      if (!auth?.token) return showLogin();
+      showApp();
+      try {
+        await loadOverview();
+      } catch (error) {
+        logout(error.message || 'Please sign in again.');
+      }
+    })();
+  </script>
 </body>
 </html>

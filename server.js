@@ -1665,6 +1665,13 @@ function requireOwner(req, res, next) {
   return next();
 }
 
+function requireAdmin(req, res, next) {
+  if (!req.management?.isAdmin) {
+    return res.status(403).json({ error: 'Admin role required' });
+  }
+  return next();
+}
+
 // List management users for the restaurant
 app.get('/api/management/users', requireManagementAuth, async (req, res) => {
   if (req.management.isAdmin) return res.json({ users: [] });
@@ -1747,6 +1754,56 @@ app.get('/api/management/all-restaurants', requireManagementAuth, async (req, re
      ORDER BY created_at DESC`
   );
   return res.json({ restaurants: rows });
+});
+
+app.get('/api/management/admin/restaurants/:id', requireManagementAuth, requireAdmin, async (req, res) => {
+  const restaurantId = Number(req.params.id);
+  if (!restaurantId) return res.status(400).json({ error: 'Invalid restaurant id' });
+
+  const restaurant = await getRestaurantById(restaurantId);
+  if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
+
+  const state = await getState(restaurantId);
+  const customersByMobile = new Map();
+  for (const order of state.orders || []) {
+    const mobile = String(order.customerMobile || order.deliveryMobile || '').trim();
+    const key = mobile || `order:${order.id}`;
+    const existing = customersByMobile.get(key) || {
+      name: order.customerName || order.deliveryName || 'Guest',
+      mobile,
+      orders: 0,
+      totalSpent: 0,
+      lastOrderAt: 0,
+      deliveryName: order.deliveryName || '',
+      deliveryMobile: order.deliveryMobile || '',
+      deliveryLat: order.deliveryLat ?? null,
+      deliveryLng: order.deliveryLng ?? null
+    };
+    existing.orders += 1;
+    existing.totalSpent += Number(order.total || 0);
+    existing.lastOrderAt = Math.max(Number(existing.lastOrderAt || 0), Number(order.createdAt || 0));
+    if (!existing.name || existing.name === 'Guest') existing.name = order.customerName || order.deliveryName || 'Guest';
+    if (!existing.mobile) existing.mobile = mobile;
+    if (!existing.deliveryName) existing.deliveryName = order.deliveryName || '';
+    if (!existing.deliveryMobile) existing.deliveryMobile = order.deliveryMobile || '';
+    if (existing.deliveryLat == null) existing.deliveryLat = order.deliveryLat ?? null;
+    if (existing.deliveryLng == null) existing.deliveryLng = order.deliveryLng ?? null;
+    customersByMobile.set(key, existing);
+  }
+
+  const pictures = [
+    ...(restaurant.imageUrl ? [{ type: 'restaurant', name: restaurant.name, imageUrl: restaurant.imageUrl }] : []),
+    ...(state.menu || [])
+      .filter((item) => item.imageUrl)
+      .map((item) => ({ type: 'menu', name: item.name, imageUrl: item.imageUrl, menuItemId: item.id }))
+  ];
+
+  return res.json({
+    restaurant,
+    ...state,
+    customers: Array.from(customersByMobile.values()).sort((a, b) => Number(b.lastOrderAt || 0) - Number(a.lastOrderAt || 0)),
+    pictures
+  });
 });
 
 app.get('/api/menu', async (req, res) => {
