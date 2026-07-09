@@ -856,6 +856,11 @@
         <div class="auth-panel" id="auth-panel-register">
           <input class="auth-inp" id="register-restaurant" placeholder="Restaurant code (e.g. gandikotadosa)" />
           <input class="auth-inp" id="register-restaurant-name" placeholder="Display name (e.g. Gandikota Dosa)" />
+          <select class="auth-inp" id="register-site">
+            <option value="new">New</option>
+            <option value="gandikota">Gandikota</option>
+            <option value="tastyfoods">TastyFoods</option>
+          </select>
           <input class="auth-inp" id="register-password" type="password" placeholder="Password" />
           <input class="auth-inp" id="register-confirm-password" type="password" placeholder="Confirm password" />
           <input class="auth-inp" id="register-setup-key" type="password" placeholder="Setup key (required after first account)" />
@@ -1447,7 +1452,7 @@
     const box = document.getElementById('available-restaurants');
     if (box) box.innerHTML = '<div class="restaurant-empty">Loading restaurants...</div>';
     try {
-      const res = await fetch('/api/public/restaurants', { headers: { Accept: 'application/json' } });
+      const res = await fetch('/api/public/restaurants?site=all', { headers: { Accept: 'application/json' } });
       if (!res.ok) throw new Error('Failed to load restaurants');
       const data = await res.json();
       renderAvailableRestaurants(Array.isArray(data?.restaurants) ? data.restaurants : []);
@@ -1497,6 +1502,7 @@
   async function registerManagement() {
     const restaurant = document.getElementById('register-restaurant').value.trim();
     const restaurantName = document.getElementById('register-restaurant-name').value.trim();
+    const site = document.getElementById('register-site').value.trim();
     const password = document.getElementById('register-password').value.trim();
     const confirm = document.getElementById('register-confirm-password').value.trim();
     const setupKey = document.getElementById('register-setup-key').value.trim();
@@ -1507,7 +1513,7 @@
     if (password.length < 6) { err.textContent = 'Password must be ≥ 6 chars.'; return; }
     if (password !== confirm) { err.textContent = 'Passwords do not match.'; return; }
     try {
-      const payload = { restaurant, restaurantName: restaurantName||restaurant, password };
+      const payload = { restaurant, restaurantName: restaurantName||restaurant, password, site };
       if (setupKey) payload.setupKey = setupKey;
       const res = await fetch('/api/management/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const data = await res.json().catch(()=>({}));

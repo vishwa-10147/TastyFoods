@@ -1415,7 +1415,7 @@
 
   async function loadRestaurants() {
     try {
-      const data = await api('/api/public/restaurants');
+      const data = await api('/api/public/restaurants?site=tastyfoods');
       restaurants = Array.isArray(data?.restaurants) ? data.restaurants : [];
       if (restaurants.length && (!explicitRestaurantCode && (!selectedRestaurantCode || !restaurants.some(r => String(r.code) === String(selectedRestaurantCode))))) {
         selectedRestaurantCode = restaurants[0].code;

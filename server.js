@@ -120,6 +120,14 @@ function normalizeRestaurantCode(input) {
   return String(input || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64);
 }
 
+function normalizeSite(input) {
+  const value = String(input || '').trim().toLowerCase();
+  if (value === 'all') return 'all';
+  if (['gandikota', 'gandikotadosa', 'gandikota-site'].includes(value)) return 'gandikota';
+  if (['tastyfoods', 'tastyfood', 'tasty-food', 'tastytables', 'tasty-tables', 'new'].includes(value)) return 'tastyfoods';
+  return 'tastyfoods';
+}
+
 function normalizeHostname(input) {
   return String(input || '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
 }
@@ -398,8 +406,8 @@ function buildRestaurantPayload(row) {
     acceptingOrders: typeof row.acceptingOrders === 'boolean'
       ? row.acceptingOrders
       : Boolean(Number(row.acceptingOrders == null ? 1 : row.acceptingOrders)),
-    reopenNote: row.reopenNote || row.reopen_note || null
-    ,
+    reopenNote: row.reopenNote || row.reopen_note || null,
+    site: normalizeSite(row.site),
     lat: row.lat == null ? null : Number(row.lat),
     lng: row.lng == null ? null : Number(row.lng)
   };
@@ -468,7 +476,7 @@ async function getRestaurantById(restaurantId) {
             accepting_orders AS "acceptingOrders",
             reopen_note AS "reopenNote",
             image_url AS "imageUrl",
-            lat, lng
+            site, lat, lng
      FROM restaurants
      WHERE id = $1`,
     [restaurantId]
@@ -485,7 +493,7 @@ async function resolveRestaurantByCode(restaurantCode, fallbackName = '') {
             accepting_orders AS "acceptingOrders",
             reopen_note AS "reopenNote",
             image_url AS "imageUrl",
-            lat, lng
+            site, lat, lng
      FROM restaurants
      WHERE code = $1
      LIMIT 1`,
@@ -496,15 +504,16 @@ async function resolveRestaurantByCode(restaurantCode, fallbackName = '') {
   const now = Date.now();
   const created = await pool.query(
     `INSERT INTO restaurants (
-       code, name, created_at, updated_at, address, cuisines, rating, rating_count, price_for_two, accepting_orders
+       code, name, created_at, updated_at, address, cuisines, rating, rating_count, price_for_two, accepting_orders, site
      )
-     VALUES ($1, $2, $3, $3, 'Miyapur', 'South Indian, Indian', 4.1, '1.4K+ ratings', 150, TRUE)
+     VALUES ($1, $2, $3, $3, 'Miyapur', 'South Indian, Indian', 4.1, '1.4K+ ratings', 150, TRUE, $4)
      RETURNING id, code, name, address, cuisines,
                rating, rating_count AS "ratingCount",
                price_for_two AS "priceForTwo",
                accepting_orders AS "acceptingOrders",
-               reopen_note AS "reopenNote"`,
-    [code, String(fallbackName || code || 'Default Restaurant').trim() || 'Default Restaurant', now]
+               reopen_note AS "reopenNote",
+               site`,
+    [code, String(fallbackName || code || 'Default Restaurant').trim() || 'Default Restaurant', now, normalizeSite(fallbackName || code || 'default')]
   );
   return buildRestaurantPayload(created.rows[0]);
 }
@@ -519,7 +528,7 @@ async function findRestaurantByCode(restaurantCode) {
             accepting_orders AS "acceptingOrders",
             reopen_note AS "reopenNote",
             image_url AS "imageUrl",
-            lat, lng
+            site, lat, lng
      FROM restaurants
      WHERE code = $1
      LIMIT 1`,
@@ -539,7 +548,7 @@ async function resolveRestaurantByCodeOrName(input) {
             accepting_orders AS "acceptingOrders",
             reopen_note AS "reopenNote",
             image_url AS "imageUrl",
-            lat, lng
+            site, lat, lng
      FROM restaurants
      WHERE code = $1 OR lower(name) = lower($2)
      ORDER BY CASE WHEN code = $1 THEN 0 ELSE 1 END
@@ -983,9 +992,19 @@ async function initDatabase() {
         rating_count TEXT NOT NULL DEFAULT '1.4K+ ratings',
         price_for_two INTEGER NOT NULL DEFAULT 150,
         accepting_orders BOOLEAN NOT NULL DEFAULT TRUE,
-        reopen_note TEXT
+        reopen_note TEXT,
+        site TEXT NOT NULL DEFAULT 'tastyfoods'
       )
     `);
+
+    await client.query(`ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS site TEXT`);
+    await client.query(`UPDATE restaurants SET site = CASE
+      WHEN lower(COALESCE(site, '')) IN ('gandikota', 'gandikotadosa', 'gandikota-site') THEN 'gandikota'
+      WHEN lower(COALESCE(site, '')) IN ('tastyfoods', 'tastyfood', 'tasty-food', 'tastytables', 'tasty-tables', 'new') THEN 'tastyfoods'
+      WHEN lower(code) LIKE '%gandikota%' OR lower(name) LIKE '%gandikota%' THEN 'gandikota'
+      ELSE 'tastyfoods'
+    END`);
+    await client.query(`ALTER TABLE restaurants ALTER COLUMN site SET DEFAULT 'tastyfoods'`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS restaurant_auth (
@@ -1088,10 +1107,10 @@ async function initDatabase() {
     const defaultName = 'Gandikota';
     const restaurantResult = await client.query(
       `INSERT INTO restaurants (
-         code, name, created_at, updated_at, address, cuisines, rating, rating_count, price_for_two, accepting_orders
+         code, name, created_at, updated_at, address, cuisines, rating, rating_count, price_for_two, accepting_orders, site
        )
-       VALUES ($1, $2, $3, $3, 'Miyapur', 'South Indian, Indian', 4.1, '1.4K+ ratings', 150, TRUE)
-       ON CONFLICT (code) DO UPDATE SET updated_at = restaurants.updated_at
+       VALUES ($1, $2, $3, $3, 'Miyapur', 'South Indian, Indian', 4.1, '1.4K+ ratings', 150, TRUE, 'gandikota')
+       ON CONFLICT (code) DO UPDATE SET updated_at = restaurants.updated_at, site = COALESCE(NULLIF(restaurants.site, ''), EXCLUDED.site)
        RETURNING id`,
       [defaultCode, defaultName, now]
     );
@@ -1299,7 +1318,10 @@ app.get('/api/public/config', async (req, res) => {
   });
 });
 
-app.get('/api/public/restaurants', async (_req, res) => {
+app.get('/api/public/restaurants', async (req, res) => {
+  const requestedSite = normalizeSite(String(req.query.site || req.query.source || 'tastyfoods').trim());
+  const siteFilter = requestedSite === 'all' ? '' : `AND COALESCE(NULLIF(lower(site), ''), 'tastyfoods') = $1`;
+  const params = requestedSite === 'all' ? [] : [requestedSite];
   const { rows } = await pool.query(
     `SELECT id, code, name, address, cuisines,
             rating, rating_count AS "ratingCount",
@@ -1307,13 +1329,15 @@ app.get('/api/public/restaurants', async (_req, res) => {
             accepting_orders AS "acceptingOrders",
             reopen_note AS "reopenNote",
             image_url AS "imageUrl",
-            lat, lng
+            site, lat, lng
      FROM restaurants
      WHERE EXISTS (
        SELECT 1 FROM restaurant_auth
        WHERE restaurant_auth.restaurant_id = restaurants.id
      )
-     ORDER BY name ASC`
+     ${siteFilter}
+     ORDER BY name ASC`,
+    params
   );
   return res.json({ restaurants: rows.map(buildRestaurantPayload) });
 });
@@ -1333,6 +1357,7 @@ app.post('/api/management/register', async (req, res) => {
   const restaurantName = String(req.body?.restaurantName || restaurantInput || '').trim();
   const password = String(req.body?.password || '').trim();
   const setupKey = String(req.body?.setupKey || '').trim();
+  const requestedSite = normalizeSite(String(req.body?.site || req.body?.siteName || req.body?.siteType || 'tastyfoods').trim());
 
   if (!restaurantInput) return res.status(400).json({ error: 'Restaurant name or code is required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -1341,6 +1366,10 @@ app.post('/api/management/register', async (req, res) => {
   const existingRestaurant = await findRestaurantByCode(normalizedCode);
   const restaurant = await resolveRestaurantByCode(restaurantInput, restaurantName || restaurantInput);
   const isNewRestaurant = !existingRestaurant;
+  if (restaurant?.id) {
+    await pool.query('UPDATE restaurants SET site = $1 WHERE id = $2', [requestedSite, restaurant.id]);
+    restaurant.site = requestedSite;
+  }
   const existing = await pool.query('SELECT restaurant_id FROM restaurant_auth WHERE restaurant_id = $1', [restaurant.id]);
   if (existing.rows.length && MANAGEMENT_SETUP_KEY && setupKey !== MANAGEMENT_SETUP_KEY) {
     return res.status(403).json({ error: 'Valid setup key required to change an existing restaurant password' });
