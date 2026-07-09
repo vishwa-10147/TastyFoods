@@ -1375,6 +1375,12 @@
     return (appState.orders || []).filter(o => clientOrderIds.has(Number(o.id)));
   }
 
+  function getRestaurantNameById(id) {
+    const n = Number(id);
+    const found = restaurants.find(r => Number(r.id) === n || String(r.code) === String(id));
+    return found?.name || 'Restaurant';
+  }
+
   function selectedRestaurant() {
     return restaurants.find(r => String(r.code) === String(selectedRestaurantCode)) || null;
   }
@@ -2043,39 +2049,76 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const restaurant = appState.restaurant || selectedRestaurant();
     if (restaurant?.acceptingOrders === false) { alert('Outlet not accepting orders.'); return; }
     syncCartWithMenu(); renderCart();
-    const activeItems = getCartItemsForRestaurant(selectedRestaurantCode);
-    if (!activeItems.length) { showWarn('Add items from this restaurant to place an order.'); return; }
+
+    const groupedByRestaurant = new Map();
+    for (const item of cart) {
+      const restaurantCode = String(item.restaurantCode || selectedRestaurantCode);
+      const entry = groupedByRestaurant.get(restaurantCode) || {
+        restaurantCode,
+        restaurantName: String(item.restaurantName || getRestaurantNameById(restaurantCode)),
+        items: []
+      };
+      entry.items.push({ menuItemId: Number(item.menuItemId), qty: Number(item.qty || 0), name: String(item.name || ''), price: Number(item.price || 0) });
+      groupedByRestaurant.set(restaurantCode, entry);
+    }
+
+    const groups = Array.from(groupedByRestaurant.values()).filter((g) => g.items.length);
+    if (!groups.length) { showWarn('Add items to place an order.'); return; }
+
     const customerName = String(document.getElementById('customer-name')?.value || '').trim();
     const customerMobile = String(document.getElementById('customer-mobile')?.value || '').trim();
     if (!customerName || !customerMobile) { alert('Please enter your name and mobile number.'); return; }
     const schedText = getScheduleText();
     if (['takeaway','preorder'].includes(orderType) && !schedText) { alert('Please select schedule date & time.'); return; }
-    if (orderType === 'delivery' && currentCartTotal < 500) { showWarn('Minimum ₹500 required for delivery.'); return; }
-    if (orderType === 'delivery' && (!deliveryLocation.lat || !deliveryLocation.lng)) { alert('Please share your location for delivery.'); return; }
+
+    for (const group of groups) {
+      const restaurantMeta = restaurants.find(r => String(r.code) === String(group.restaurantCode)) || null;
+      if (restaurantMeta?.acceptingOrders === false) {
+        alert(`${group.restaurantName || group.restaurantCode} is not accepting orders right now.`);
+        return;
+      }
+      const groupTotal = group.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+      if (orderType === 'delivery' && groupTotal < 500) {
+        showWarn(`Minimum ₹500 required for delivery from ${group.restaurantName || group.restaurantCode}.`);
+        return;
+      }
+    }
+
     clearWarn();
     const baseNotes = String(document.getElementById('notes')?.value || '').trim();
     const notes = [baseNotes, schedText].filter(Boolean).join(' | ');
-    const payload = {
-      restaurantCode: selectedRestaurantCode, orderType,
-      tableNumber: null, notes, customerName, customerMobile,
-      items: activeItems.map((i) => ({ menuItemId: i.menuItemId, qty: i.qty }))
-    };
-    if (orderType === 'delivery') { payload.deliveryLat = deliveryLocation.lat; payload.deliveryLng = deliveryLocation.lng; }
+
     try {
-      const res = await api('/api/orders', 'POST', payload);
-      if (res?.order?.id) {
-        const newId = Number(res.order.id);
-        appState.orders = [res.order, ...(appState.orders || []).filter(o => Number(o.id) !== newId)];
+      const createdOrders = [];
+      for (const group of groups) {
+        const payload = {
+          restaurantCode: group.restaurantCode,
+          orderType,
+          tableNumber: null,
+          notes,
+          customerName,
+          customerMobile,
+          items: group.items.map((i) => ({ menuItemId: i.menuItemId, qty: i.qty }))
+        };
+        if (orderType === 'delivery') { payload.deliveryLat = deliveryLocation.lat; payload.deliveryLng = deliveryLocation.lng; }
+        const res = await api('/api/orders', 'POST', payload);
+        if (res?.order?.id) createdOrders.push(res.order);
       }
-      rememberOrder(res.order.id);
-      setPendingPayment(res.order.id);
-      setSelectedTracking(res.order.id);
-      cart = cart.filter((item) => String(item.restaurantCode || selectedRestaurantCode) !== String(selectedRestaurantCode));
+
+      if (!createdOrders.length) throw new Error('No orders could be created');
+
+      appState.orders = [...createdOrders, ...(appState.orders || []).filter((o) => !createdOrders.some((created) => Number(created.id) === Number(o.id)))];
+      createdOrders.forEach((order) => rememberOrder(order.id));
+      const latestOrderId = createdOrders[createdOrders.length - 1]?.id;
+      const firstPendingOrderId = createdOrders.find((order) => Number(order.paid) !== 1)?.id || latestOrderId;
+      setPendingPayment(firstPendingOrderId);
+      setSelectedTracking(latestOrderId || firstPendingOrderId);
+      cart = [];
       document.getElementById('notes').value = '';
       saveDraft(); renderCart(); syncMobileCartFab();
-      if (PAYMENT_TEST_MODE) switchView('tracking', null);
-      else switchView('payment', null);
+      if (PAYMENT_TEST_MODE) switchView('tracking', null); else switchView('payment', null);
       renderPayment();
+      showWarn(`Orders placed successfully for ${createdOrders.length} outlet${createdOrders.length > 1 ? 's' : ''}.`);
     } catch (e) { alert(e.message); }
   }
 
@@ -2089,7 +2132,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const cgst = Number(o.cgst || (gst / 2));
     const sgst = Number(o.sgst || (gst - cgst));
     const total = Number(o.total || (sub + cgst + sgst));
-    const restoName = esc(appState.restaurant?.name || selectedRestaurant()?.name || 'Restaurant');
+    const restoName = esc(getRestaurantNameById(o.restaurantId || selectedRestaurantCode));
     return `
       <div class="receipt-card">
         <div class="receipt-head">
@@ -2134,7 +2177,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
       setSelectedTracking(orders[0].id);
     }
     pills.innerHTML = orders.slice(0,8).map(o => `
-      <div class="track-pill ${o.id === selectedTrackingOrderId ? 'active' : ''}" onclick="selectOrder(${o.id})">${esc(o.label)}</div>
+      <div class="track-pill ${o.id === selectedTrackingOrderId ? 'active' : ''}" onclick="selectOrder(${o.id})">${esc(o.label)} · ${esc(getRestaurantNameById(o.restaurantId || o.restaurantCode))}</div>
     `).join('');
     const o = orders.find(x => x.id === selectedTrackingOrderId);
     const elapsed = Math.floor((Date.now() - o.createdAt) / 60000);
