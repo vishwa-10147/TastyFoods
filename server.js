@@ -1358,8 +1358,21 @@ app.get('/api/public/state', async (req, res) => {
   const restaurantInput = String(req.query.restaurant || req.query.restaurantCode || 'gandikotadosa').trim();
   const restaurant = await resolveRestaurantByCodeOrName(restaurantInput) || await resolveRestaurantByCode('gandikotadosa', 'Gandikota');
   if (!restaurant?.id) return res.status(404).json({ error: 'Restaurant not found' });
+  const requestedOrderIds = String(req.query.orderIds || '')
+    .split(',')
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  const state = await getState(restaurant.id);
+  if (requestedOrderIds.length) {
+    const requested = new Set(requestedOrderIds);
+    const trackedOrders = (await getOrders(null)).filter((order) => requested.has(Number(order.id)));
+    const mergedOrders = new Map((state.orders || []).map((order) => [Number(order.id), order]));
+    trackedOrders.forEach((order) => mergedOrders.set(Number(order.id), order));
+    state.orders = Array.from(mergedOrders.values())
+      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  }
   return res.json({
-    ...(await getState(restaurant.id)),
+    ...state,
     restaurant
   });
 });

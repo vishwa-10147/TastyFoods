@@ -173,6 +173,54 @@
       background: rgba(255, 255, 255, 0.12);
       color: rgba(255,255,255,0.85);
     }
+    .mobile-restaurant-panel {
+      display: none;
+      background: var(--cream);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px 12px;
+      position: sticky;
+      top: 56px;
+      z-index: 45;
+    }
+    .mobile-restaurant-panel .restaurant-list-title {
+      color: var(--ink-l);
+      margin-bottom: 8px;
+    }
+    .mobile-restaurant-panel .restaurant-list {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 2px 2px 8px;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-restaurant-panel .restaurant-card {
+      min-width: 220px;
+      max-width: 260px;
+      background: var(--white);
+      border-color: var(--border);
+      box-shadow: 0 8px 24px rgba(26,19,16,0.08);
+      scroll-snap-align: start;
+    }
+    .mobile-restaurant-panel .restaurant-card.active {
+      border-color: var(--clay);
+      background: var(--clay-l);
+      box-shadow: 0 10px 28px rgba(232,96,58,0.16);
+    }
+    .mobile-restaurant-panel .restaurant-name { color: var(--ink); }
+    .mobile-restaurant-panel .restaurant-meta { color: var(--ink-l); }
+    .mobile-restaurant-panel .restaurant-badge {
+      background: var(--paper);
+      color: var(--ink-m);
+    }
+    .mobile-restaurant-panel .restaurant-badge.open {
+      background: var(--sage-l);
+      color: var(--sage);
+    }
+    .mobile-restaurant-panel .restaurant-badge.closed {
+      background: #fef2f2;
+      color: #dc2626;
+    }
 
     /* ── MAIN ─────────────────────────────────────────── */
     #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -866,6 +914,7 @@
       #sidebar { display: none; }
       #mobile-nav { display: block; }
       #mobile-cart-fab { display: block; }
+      .mobile-restaurant-panel { display: block; }
       html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
       body { padding-bottom: env(safe-area-inset-bottom); background: var(--cream); }
       #app, #main, .content, .menu-col { width: 100%; max-width: 100%; min-width: 0; }
@@ -1019,6 +1068,10 @@
         <div class="live-dot" id="live-status-dot">Live</div>
         <div id="clock"></div>
       </div>
+    </div>
+    <div class="mobile-restaurant-panel">
+      <div class="restaurant-list-title">Choose Restaurant</div>
+      <div id="mobile-restaurant-list" class="restaurant-list"></div>
     </div>
 
     <!-- ORDER VIEW -->
@@ -1225,6 +1278,7 @@
   const CLIENT_UPI_KEY = 'ts_upi_id';
   const CLIENT_LAST_ORDER_KEY = 'ts_last_order';
   const CLIENT_RESTAURANT_KEY = 'ts_restaurant';
+  const CLIENT_CUSTOMER_KEY = 'ts_customer_profile';
   const DRAFT_KEY_PREFIX = 'ts_draft_';
 
   let appState = { menu: [], tables: [], orders: [], restaurant: null };
@@ -1309,6 +1363,37 @@
     return cart.filter((item) => String(item.restaurantCode || selectedRestaurantCode) === String(code || selectedRestaurantCode));
   }
 
+  function cartItemCount() {
+    return cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  }
+
+  function loadCustomerProfile() {
+    try {
+      const profile = JSON.parse(localStorage.getItem(CLIENT_CUSTOMER_KEY) || 'null');
+      return profile && typeof profile === 'object' ? {
+        name: String(profile.name || '').trim(),
+        mobile: String(profile.mobile || '').trim()
+      } : { name: '', mobile: '' };
+    } catch {
+      return { name: '', mobile: '' };
+    }
+  }
+
+  function saveCustomerProfile() {
+    const name = String(document.getElementById('customer-name')?.value || '').trim();
+    const mobile = String(document.getElementById('customer-mobile')?.value || '').trim();
+    if (!name && !mobile) return;
+    try { localStorage.setItem(CLIENT_CUSTOMER_KEY, JSON.stringify({ name, mobile })); } catch {}
+  }
+
+  function restoreCustomerProfile() {
+    const profile = loadCustomerProfile();
+    const nameIn = document.getElementById('customer-name');
+    const mobileIn = document.getElementById('customer-mobile');
+    if (nameIn && !String(nameIn.value || '').trim() && profile.name) nameIn.value = profile.name;
+    if (mobileIn && !String(mobileIn.value || '').trim() && profile.mobile) mobileIn.value = profile.mobile;
+  }
+
   function draftKey() {
     return `${DRAFT_KEY_PREFIX}global`;
   }
@@ -1372,7 +1457,9 @@
   }
 
   function clientOrders() {
-    return (appState.orders || []).filter(o => clientOrderIds.has(Number(o.id)));
+    return (appState.orders || [])
+      .filter(o => clientOrderIds.has(Number(o.id)))
+      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   }
 
   function getRestaurantNameById(id) {
@@ -1458,7 +1545,9 @@
   async function loadState() {
     const code = String(selectedRestaurantCode || 'default');
     try {
-      const data = await api(`/api/public/state?restaurant=${encodeURIComponent(code)}`);
+      const trackedIds = Array.from(clientOrderIds).filter(Boolean).join(',');
+      const trackedQuery = trackedIds ? `&orderIds=${encodeURIComponent(trackedIds)}` : '';
+      const data = await api(`/api/public/state?restaurant=${encodeURIComponent(code)}${trackedQuery}`);
       appState = data;
     } catch {
       if (!appState.menu) appState = { menu: getDemoMenu(), tables: [], orders: [], restaurant: null };
@@ -1563,13 +1652,18 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function renderRestaurantSidebar() {
-    const container = document.getElementById('restaurant-list');
-    if (!container) return;
+    const containers = [
+      document.getElementById('restaurant-list'),
+      document.getElementById('mobile-restaurant-list')
+    ].filter(Boolean);
+    if (!containers.length) return;
     if (!restaurants.length) {
-      container.innerHTML = `<div class="restaurant-card"><div class="restaurant-name">No restaurants registered</div><div class="restaurant-meta">Register a restaurant from the management panel and it will appear here automatically.</div></div>`;
+      containers.forEach((container) => {
+        container.innerHTML = `<div class="restaurant-card"><div class="restaurant-name">No restaurants registered</div><div class="restaurant-meta">Register a restaurant from the management panel and it will appear here automatically.</div></div>`;
+      });
       return;
     }
-    container.innerHTML = restaurants.map((r) => {
+    const html = restaurants.map((r) => {
       const active = String(r.code) === String(selectedRestaurantCode);
       const statusClass = r.acceptingOrders ? 'open' : 'closed';
       const rating = Number.isFinite(Number(r.rating)) ? `${Number(r.rating).toFixed(1)} ⭐` : String(r.rating || '4.0 ⭐');
@@ -1584,6 +1678,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
         </div>
       `;
     }).join('');
+    containers.forEach((container) => {
+      container.innerHTML = html;
+    });
   }
 
   async function selectRestaurant(code) {
@@ -1834,7 +1931,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   function refreshMenuQty(id) {
     const el = document.getElementById(`mq-${id}`);
     if (!el) return;
-    const line = cart.find(l => Number(l.menuItemId) === Number(id));
+    const line = cart.find(l => Number(l.menuItemId) === Number(id) && String(l.restaurantCode || selectedRestaurantCode) === String(selectedRestaurantCode || ''));
     el.textContent = String(Number(line?.qty || 0));
   }
 
@@ -1850,14 +1947,17 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     afterCartUpdate(menuItemId);
   }
 
-  function updateCartQty(menuItemId, delta) {
+  function updateCartQty(menuItemId, delta, restaurantCodeOverride) {
     const id = Number(menuItemId); const d = Number(delta);
     if (!id || !d) return;
-    const restaurantCode = String(selectedRestaurantCode || '');
-    const line = cart.find((l) => Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === restaurantCode);
+    const restaurantCode = String(restaurantCodeOverride || selectedRestaurantCode || '');
+    const sameRestaurantLine = cart.find((l) => Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === restaurantCode);
+    const matchingLines = cart.filter((l) => Number(l.menuItemId) === id);
+    const line = sameRestaurantLine || (matchingLines.length === 1 ? matchingLines[0] : null);
     if (!line) { if (d > 0) addToCart(id); return; }
+    const effectiveRestaurantCode = String(line.restaurantCode || restaurantCode);
     const next = Number(line.qty) + d;
-    if (next <= 0) cart = cart.filter((l) => !(Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === restaurantCode));
+    if (next <= 0) cart = cart.filter((l) => !(Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === effectiveRestaurantCode));
     else line.qty = next;
     afterCartUpdate(id);
   }
@@ -1908,9 +2008,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function totalsHTML() {
-    const activeItems = getCartItemsForRestaurant(selectedRestaurantCode);
-    const itemsTotal = activeItems.reduce((s,i) => s + i.price * i.qty, 0);
-    const parcelCharge = activeItems.length ? parcelChargeForType() : 0;
+    const itemsTotal = cart.reduce((s,i) => s + Number(i.price || 0) * Number(i.qty || 0), 0);
+    const parcelCharge = cart.length ? parcelChargeForType() : 0;
     const inclusive = itemsTotal + parcelCharge;
     const sub = Number((inclusive / 1.05).toFixed(2));
     const gst = Number((inclusive - sub).toFixed(2));
@@ -1932,7 +2031,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     if (parcelEl) parcelEl.textContent = money(parcelCharge);
     const items = document.getElementById('cart-items');
     if (items) items.innerHTML = cartHTML();
-    const count = getCartItemsForRestaurant(selectedRestaurantCode).reduce((s,i) => s + i.qty, 0);
+    const count = cartItemCount();
     const badge = document.getElementById('cart-count-badge');
     if (badge) badge.textContent = String(count);
     const mob = document.getElementById('cart-mobile-badge');
@@ -1962,7 +2061,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   function syncMobileCartFab() {
     const fab = document.getElementById('mobile-cart-fab');
     if (!fab) return;
-    const count = getCartItemsForRestaurant(selectedRestaurantCode).reduce((s,i) => s + i.qty, 0);
+    const count = cartItemCount();
     const isMobile = window.innerWidth <= 900;
     if (isMobile && count > 0) {
       fab.style.display = 'block';
@@ -2068,6 +2167,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const customerName = String(document.getElementById('customer-name')?.value || '').trim();
     const customerMobile = String(document.getElementById('customer-mobile')?.value || '').trim();
     if (!customerName || !customerMobile) { alert('Please enter your name and mobile number.'); return; }
+    saveCustomerProfile();
     const schedText = getScheduleText();
     if (['takeaway','preorder'].includes(orderType) && !schedText) { alert('Please select schedule date & time.'); return; }
 
@@ -2132,7 +2232,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const cgst = Number(o.cgst || (gst / 2));
     const sgst = Number(o.sgst || (gst - cgst));
     const total = Number(o.total || (sub + cgst + sgst));
-    const restoName = esc(getRestaurantNameById(o.restaurantId || selectedRestaurantCode));
+    const restoName = esc(o.restaurantName || getRestaurantNameById(o.restaurantCode || o.restaurantId || selectedRestaurantCode));
     return `
       <div class="receipt-card">
         <div class="receipt-head">
