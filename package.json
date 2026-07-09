@@ -1,0 +1,34 @@
+{
+  "name": "foodordering",
+  "version": "1.0.0",
+  "description": "![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js&logoColor=white) ![Express](https://img.shields.io/badge/Express-5.x-000000?logo=express&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white) ![Socket.IO](https://img.shields.io/badge/Socket.IO-Realtime-010101?logo=socket.io&logoColor=white) ![License](https://img.shields.io/badge/License-ISC-blue)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node -e \"console.log('Tests not yet configured')\"",
+    "whatsapp-test": "node -e \"require('dotenv').config(); const ws = require('./whatsappService'); if(ws.WHATSAPP_ENABLED) { ws.sendTestMessage(process.env.TEST_PHONE_NUMBER || '9010002233').then(() => console.log('Test sent')).catch(e => console.error('Error:', e.message)); } else { console.log('WhatsApp not configured'); }\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": "20.x",
+    "npm": "10.x"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "csv-parse": "^5.5.4",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "pg": "^8.20.0",
+    "razorpay": "^2.9.6",
+    "socket.io": "^4.8.3",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "express-validator": "^7.0.1"
+  }
+}

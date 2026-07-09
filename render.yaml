@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: foodorder
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: PGSSL
+        sync: false
+      - key: MANAGEMENT_AUTH_SECRET
+        sync: false
+      - key: MANAGEMENT_SETUP_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX
+        value: "240"
+      - key: PUBLIC_DEFAULT_RESTAURANT_CODE
+        sync: false
+      - key: RESTAURANT_DOMAIN_MAP
+        sync: false

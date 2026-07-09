@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Outer Screen - Order Status</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Urbanist:wght@500;600;700;800&display=swap');
+
+    :root {
+      --bg-1: #f2eeea;
+      --bg-2: #f7f5f2;
+      --ink: #1f1a17;
+      --muted: #6f665d;
+      --card: #ffffff;
+      --border: #e6ddd4;
+      --prep-bg: #fdf1e0;
+      --prep-ink: #8f4e16;
+      --ready-bg: #f5e8de;
+      --ready-ink: #8b4a30;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Urbanist', sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(227, 195, 157, 0.34) 0%, transparent 22%),
+        radial-gradient(circle at 84% 18%, rgba(189, 205, 230, 0.3) 0%, transparent 22%),
+        linear-gradient(130deg, var(--bg-1) 0%, var(--bg-2) 100%);
+      padding: 18px;
+    }
+
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 12px 28px rgba(46, 37, 30, 0.09);
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: clamp(32px, 4vw, 60px);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      font-family: 'Cormorant Garamond', serif;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: clamp(12px, 1.2vw, 16px);
+      margin-top: 4px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .restaurant-select {
+      border: 1px solid var(--border);
+      border-radius: 0;
+      background: #fff;
+      padding: 9px 10px;
+      font-size: 14px;
+      min-width: 220px;
+      color: var(--ink);
+    }
+
+    .live-chip {
+      border-radius: 0;
+      background: #f5e8de;
+      color: #8b4a30;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+
+    .full-btn {
+      border: 1px solid #c8b5a6;
+      background: #ffffff;
+      color: #4b3f36;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      border-radius: 0;
+      min-width: 140px;
+    }
+
+    .full-btn:hover {
+      background: #f7efe8;
+      border-color: #bca48f;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    body.fullscreen-mode {
+      padding: 0;
+      background: #f7f5f2;
+    }
+
+    body.fullscreen-mode .wrap {
+      max-width: none;
+      width: 100vw;
+      min-height: 100vh;
+      margin: 0;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      padding: 12px;
+      background: #f7f5f2;
+      backdrop-filter: none;
+    }
+
+    body.fullscreen-mode .top {
+      display: none;
+    }
+
+    body.fullscreen-mode .board {
+      min-height: calc(100vh - 24px);
+      align-items: stretch;
+    }
+
+    body.fullscreen-mode .col {
+      min-height: 0;
+    }
+
+    .col {
+      border: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--card);
+      overflow: hidden;
+      min-height: 440px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .col-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: clamp(18px, 2.1vw, 28px);
+      font-weight: 800;
+    }
+
+    .col-head.preparing {
+      background: var(--prep-bg);
+      color: var(--prep-ink);
+    }
+
+    .col-head.ready {
+      background: var(--ready-bg);
+      color: var(--ready-ink);
+    }
+
+    .count {
+      font-size: clamp(14px, 1.4vw, 20px);
+      border-radius: 0;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 2px 10px;
+    }
+
+    .list {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      align-content: start;
+      flex: 1;
+    }
+
+    .order {
+      border: 1px solid var(--border);
+      border-radius: 0;
+      background: #fff;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: rise 0.25s ease;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .order-id {
+      font-size: clamp(20px, 2.5vw, 34px);
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      line-height: 1;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      height: 100%;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed var(--border);
+      border-radius: 0;
+      color: var(--muted);
+      font-size: clamp(16px, 1.8vw, 22px);
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+
+      .list {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 10px;
+      }
+
+      .wrap {
+        padding: 12px;
+      }
+
+      .list {
+        grid-template-columns: 1fr;
+      }
+
+      .restaurant-select {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">Live Order Board</div>
+        <div class="sub" id="restaurant-name">Loading restaurant...</div>
+      </div>
+      <div class="status-row">
+        <select id="restaurant-selector" class="restaurant-select"></select>
+        <div class="live-chip" id="live-time">Live</div>
+        <button id="fullscreen-toggle" class="full-btn" type="button">Enter Full Screen</button>
+      </div>
+    </div>
+
+    <div class="board">
+      <section class="col">
+        <div class="col-head preparing">Preparing <span class="count" id="preparing-count">0</span></div>
+        <div class="list" id="preparing-list"></div>
+      </section>
+      <section class="col">
+        <div class="col-head ready">Ready <span class="count" id="ready-count">0</span></div>
+        <div class="list" id="ready-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const SELECTED_RESTAURANT_KEY = 'foodorder_outer_selected_restaurant_code';
+    let selectedRestaurantCode = 'default';
+    let pollTimer = null;
+
+    function isFullscreenActive() {
+      return Boolean(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.msFullscreenElement
+      );
+    }
+
+    function updateFullscreenButton() {
+      const button = document.getElementById('fullscreen-toggle');
+      if (!button) return;
+      const isFullscreen = isFullscreenActive();
+      document.body.classList.toggle('fullscreen-mode', isFullscreen);
+      button.textContent = isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen';
+    }
+
+    async function toggleFullscreen() {
+      try {
+        const target = document.documentElement;
+        if (!isFullscreenActive()) {
+          if (target.requestFullscreen) {
+            await target.requestFullscreen();
+          } else if (target.webkitRequestFullscreen) {
+            target.webkitRequestFullscreen();
+          } else if (target.msRequestFullscreen) {
+            target.msRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+      } catch (_error) {
+      }
+      updateFullscreenButton();
+    }
+
+    function resolveApiUrl(path) {
+      const rawPath = String(path || '').trim();
+      if (!rawPath) return rawPath;
+      if (/^https?:\/\//i.test(rawPath)) return rawPath;
+
+      const normalized = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+      const host = String(window.location.hostname || '').toLowerCase();
+      const protocol = String(window.location.protocol || '').toLowerCase();
+      const port = String(window.location.port || '');
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+      const isBackendOrigin = isLocalHost && port === '3000';
+
+      if (protocol === 'file:' || (isLocalHost && !isBackendOrigin)) {
+        return `http://localhost:3000${normalized}`;
+      }
+      return normalized;
+    }
+
+    async function api(path) {
+      const res = await fetch(resolveApiUrl(path), { headers: { 'x-actor': 'outer-screen' } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    function renderList(targetId, orders, emptyText) {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+
+      if (!orders.length) {
+        target.innerHTML = `<div class="empty">${emptyText}</div>`;
+        return;
+      }
+
+      target.innerHTML = orders.map((order) => `
+        <article class="order">
+          <div class="order-id">${order.label}</div>
+        </article>
+      `).join('');
+    }
+
+    function renderBoard(state) {
+      const orders = Array.isArray(state?.orders) ? state.orders : [];
+      const paidOrders = orders.filter((order) => Number(order.paid) === 1);
+      const preparing = paidOrders.filter((order) => order.status === 'preparing');
+      const ready = paidOrders.filter((order) => order.status === 'ready');
+
+      document.getElementById('preparing-count').textContent = String(preparing.length);
+      document.getElementById('ready-count').textContent = String(ready.length);
+
+      renderList('preparing-list', preparing, 'No preparing orders');
+      renderList('ready-list', ready, 'No ready orders');
+    }
+
+    function updateLiveTime() {
+      const now = new Date();
+      document.getElementById('live-time').textContent = `Live ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    }
+
+    async function loadRestaurants() {
+      const selector = document.getElementById('restaurant-selector');
+      const result = await api('/api/public/restaurants');
+      const restaurants = Array.isArray(result?.restaurants) ? result.restaurants : [];
+
+      if (!restaurants.length) {
+        selector.innerHTML = '<option value="default">Default Restaurant</option>';
+        selectedRestaurantCode = 'default';
+        return;
+      }
+
+      if (!restaurants.some((r) => String(r.code) === selectedRestaurantCode)) {
+        selectedRestaurantCode = String(restaurants[0].code || 'default');
+      }
+
+      selector.innerHTML = restaurants.map((r) => `
+        <option value="${String(r.code)}">${String(r.name || r.code)}</option>
+      `).join('');
+      selector.value = selectedRestaurantCode;
+
+      selector.onchange = async (event) => {
+        selectedRestaurantCode = String(event.target.value || 'default');
+        try {
+          localStorage.setItem(SELECTED_RESTAURANT_KEY, selectedRestaurantCode);
+        } catch (_error) {
+        }
+        await refreshBoard();
+      };
+    }
+
+    async function refreshBoard() {
+      const data = await api(`/api/public/state?restaurantCode=${encodeURIComponent(selectedRestaurantCode)}`);
+      const restaurantName = String(data?.restaurant?.name || selectedRestaurantCode || 'Restaurant');
+      document.getElementById('restaurant-name').textContent = restaurantName;
+      renderBoard(data);
+      updateLiveTime();
+    }
+
+    (async function init() {
+      try {
+        const fromUrl = String(new URLSearchParams(window.location.search).get('restaurant') || '').trim();
+        const fromStorage = String(localStorage.getItem(SELECTED_RESTAURANT_KEY) || '').trim();
+        selectedRestaurantCode = fromUrl || fromStorage || 'default';
+      } catch (_error) {
+        selectedRestaurantCode = 'default';
+      }
+
+      updateLiveTime();
+      setInterval(updateLiveTime, 1000);
+
+      try {
+        await loadRestaurants();
+        await refreshBoard();
+      } catch (error) {
+        document.getElementById('restaurant-name').textContent = 'Unable to load order board';
+      }
+
+      const fullscreenButton = document.getElementById('fullscreen-toggle');
+      if (fullscreenButton) {
+        fullscreenButton.addEventListener('click', toggleFullscreen);
+      }
+      document.addEventListener('fullscreenchange', updateFullscreenButton);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+      document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+      updateFullscreenButton();
+
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        try {
+          await refreshBoard();
+        } catch (_error) {
+        }
+      }, 5000);
+    })();
+  </script>
+</body>
+</html>

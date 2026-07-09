@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TastyFoods Admin Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #fffaf6;
+      --panel: #ffffff;
+      --border: #f1d8c4;
+      --text: #111827;
+      --muted: #64748b;
+      --accent: #f97316;
+      --accent-dark: #ea580c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #fffaf6 0%, #fff3e7 100%);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 20px 45px rgba(249, 115, 22, 0.12);
+    }
+    .hero h1 { font-size: 2rem; margin: 0 0 10px; }
+    .hero p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.6; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+    }
+    .card h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .card p { margin: 0 0 14px; color: var(--muted); line-height: 1.5; font-size: 0.95rem; }
+    .card a, .card button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      transition: background 0.2s ease;
+    }
+    .card a:hover { background: var(--accent-dark); }
+    .note {
+      margin-top: 20px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .pill {
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #fff3e7;
+      color: var(--accent-dark);
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>TastyFoods Admin Dashboard</h1>
+      <p>Use this area to manage restaurant access, menu updates, images, and order flow for your food court.</p>
+      <div style="margin-top: 14px;">
+        <span class="pill">Restaurant registration</span>
+        <span class="pill">Menu updates</span>
+        <span class="pill">Image uploads</span>
+        <span class="pill">Order status</span>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Management Console</h2>
+        <p>Open the full restaurant owner panel to manage menus, images, and outlet status.</p>
+        <a href="/management.html">Open Admin Panel</a>
+      </div>
+      <div class="card">
+        <h2>Customer Storefront</h2>
+        <p>Preview the public TastyFoods ordering experience for customers.</p>
+        <a href="/tastyfoods">Open Store</a>
+      </div>
+      <div class="card">
+        <h2>Custom Domain Setup</h2>
+        <p>Point your domain to this Render service and route restaurant traffic through the backend.</p>
+        <a href="/DEPLOYMENT_RENDER.md">View Render Guide</a>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>Tip:</strong> If you are using a custom domain, set your DNS to point to the Render service, then add the domain and restaurant mapping values in the Render environment variables. The app already supports restaurant-based routing and public restaurant discovery.
+    </div>
+  </div>
+</body>
+</html>

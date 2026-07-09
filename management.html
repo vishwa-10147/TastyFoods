@@ -1,0 +1,2954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Tableside — Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg:       #f5f6f8;
+      --bg2:      #ffffff;
+      --bg3:      #f8fafc;
+      --bg4:      #eef2f7;
+      --border:   #e2e8f0;
+      --border2:  #cbd5e1;
+      --text:     #111827;
+      --text2:    #374151;
+      --text3:    #64748b;
+      --fire:     #f97316;
+      --fire-d:   #ea580c;
+      --fire-l:   rgba(244,107,53,0.12);
+      --fire-m:   rgba(244,107,53,0.25);
+      --green:    #22c55e;
+      --green-l:  #dcfce7;
+      --amber:    #f59e0b;
+      --amber-l:  #fef3c7;
+      --blue:     #3b82f6;
+      --blue-l:   #dbeafe;
+      --red:      #ef4444;
+      --red-l:    #fee2e2;
+      --purple:   #a855f7;
+      --purple-l: #f3e8ff;
+      --radius:   10px;
+      --font-sans: 'Instrument Sans', sans-serif;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* ── AUTH GATE ─────────────────────────────────────── */
+    #auth-gate {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+    }
+    .auth-wrap {
+      width: 760px; max-width: calc(100vw - 32px);
+    }
+    .auth-grid { display: grid; grid-template-columns: minmax(0, 400px) minmax(260px, 1fr); gap: 18px; align-items: start; }
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .auth-logo {
+      font-family: var(--font-display);
+      font-size: 28px; font-weight: 800; color: var(--text);
+      margin-bottom: 4px; letter-spacing: -0.5px;
+    }
+    .auth-logo span { color: var(--fire); }
+    .auth-sub { font-size: 13px; color: var(--text3); margin-bottom: 28px; }
+    .auth-tabs {
+      display: flex; gap: 2px; background: var(--bg3);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 3px; margin-bottom: 20px;
+    }
+    .auth-tab {
+      flex: 1; padding: 8px; border: none; border-radius: 7px;
+      background: none; color: var(--text3); font-family: var(--font-sans);
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .auth-tab.active { background: var(--bg4); color: var(--text); }
+    .auth-panel { display: none; }
+    .auth-panel.active { display: block; }
+    .auth-inp {
+      width: 100%; background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 11px 14px;
+      color: var(--text); font-family: var(--font-sans); font-size: 13px;
+      margin-bottom: 10px; outline: none; transition: border-color 0.2s;
+    }
+    .auth-inp:focus { border-color: var(--fire); }
+    .auth-inp::placeholder { color: var(--text3); }
+    .auth-submit {
+      width: 100%; padding: 12px; border-radius: var(--radius);
+      background: var(--fire); color: white; border: none;
+      font-family: var(--font-display); font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.2px;
+    }
+    .auth-submit:hover { background: var(--fire-d); }
+    .auth-err { font-size: 12px; color: var(--red); margin-top: 10px; min-height: 16px; }
+    .auth-note { font-size: 12px; color: var(--green); margin-top: 8px; min-height: 16px; }
+    .auth-list-head {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      margin-bottom: 10px;
+    }
+    .auth-list-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+    .auth-list-refresh {
+      border: 1px solid var(--border); background: var(--bg3); color: var(--text2);
+      border-radius: 7px; padding: 6px 8px; font-size: 11px; cursor: pointer;
+    }
+    .auth-list-refresh:hover { color: var(--text); border-color: var(--border2); }
+    .sound-btn {
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text2);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .sound-btn.active { color: var(--green); border-color: rgba(34,197,94,0.35); background: var(--green-l); }
+    .restaurant-list {
+      display: grid; gap: 8px;
+      max-height: min(430px, calc(100dvh - 220px));
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .restaurant-row {
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .restaurant-row-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+    .restaurant-row-name { font-weight: 700; color: var(--text); line-height: 1.25; }
+    .restaurant-row-code { font-family: var(--font-mono); color: var(--text3); font-size: 10px; margin-top: 3px; }
+    .restaurant-row-meta { color: var(--text2); font-size: 11px; margin-top: 6px; line-height: 1.35; }
+    .restaurant-status { font-size: 10px; font-weight: 700; padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+    .restaurant-status.open { color: var(--green); background: var(--green-l); }
+    .restaurant-status.closed { color: var(--red); background: var(--red-l); }
+    .restaurant-row-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .restaurant-row-actions button,
+    .restaurant-row-actions a {
+      flex: 1; text-align: center; text-decoration: none;
+      border: 1px solid var(--border); background: var(--bg4); color: var(--text);
+      border-radius: 7px; padding: 7px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .restaurant-row-actions a { color: var(--fire); }
+    .restaurant-empty { color: var(--text3); font-size: 12px; line-height: 1.5; padding: 12px; border: 1px dashed var(--border); border-radius: 8px; }
+
+    /* ── APP SHELL ──────────────────────────────────────── */
+    #app { display: none; height: 100dvh; flex-direction: row; }
+    #app.visible { display: flex; }
+
+    /* ── SIDEBAR ─────────────────────────────────────────── */
+    #sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .sb-logo {
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sb-brand {
+      font-family: var(--font-display);
+      font-size: 20px; font-weight: 800; color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .sb-brand span { color: var(--fire); }
+    .sb-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text3); margin-top: 2px;
+    }
+
+    .nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+    .nav-section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text3);
+      padding: 14px 18px 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 18px; cursor: pointer; color: var(--text3);
+      font-size: 13px; font-weight: 500; transition: all 0.15s;
+      border-left: 2px solid transparent; position: relative;
+    }
+    .nav-item:hover { color: var(--text); background: var(--bg3); }
+    .nav-item.active { color: var(--text); border-left-color: var(--fire); background: var(--fire-l); }
+    .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto; background: var(--fire); color: white;
+      font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 99px; min-width: 18px; text-align: center;
+    }
+
+    .sb-footer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .sb-chip {
+      font-size: 11px; font-weight: 600; color: var(--text3);
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 7px; padding: 5px 10px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sb-footer-btns { display: flex; gap: 6px; }
+    .sb-btn {
+      flex: 1; padding: 7px 8px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text2); font-family: var(--font-sans); font-size: 11px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    .sb-btn:hover { border-color: var(--fire); color: var(--fire); }
+
+    /* ── MAIN ─────────────────────────────────────────── */
+    #main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+
+    .topbar {
+      height: 52px; padding: 0 22px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .tb-title {
+      font-family: var(--font-display);
+      font-size: 16px; font-weight: 700; color: var(--text);
+      letter-spacing: -0.2px;
+    }
+    .tb-right { display: flex; align-items: center; gap: 10px; }
+    .live-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; color: var(--green);
+      font-family: var(--font-mono);
+    }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    #clock { font-family: var(--font-mono); font-size: 12px; color: var(--text3); }
+
+    /* ── CONTENT ─────────────────────────────────────────── */
+    .content { display: none; flex: 1; overflow-y: auto; }
+    .content.active { display: block; }
+    .content-inner { padding: 22px; }
+
+    /* ── CARDS & PANELS ─────────────────────────────────── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card-head {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .card-title {
+      font-family: var(--font-display); font-size: 15px;
+      font-weight: 700; color: var(--text);
+    }
+    .card-body { padding: 16px 18px; }
+
+    /* ── METRICS ─────────────────────────────────────────── */
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .metric-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .metric-card:hover { border-color: var(--border2); }
+    .metric-label { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+    .metric-value {
+      font-family: var(--font-display); font-size: 32px;
+      font-weight: 700; color: var(--text); line-height: 1;
+      margin-bottom: 4px;
+    }
+    .metric-sub { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+    .metric-accent {
+      position: absolute; top: 0; right: 0;
+      width: 3px; height: 100%;
+    }
+    .metric-accent.fire { background: var(--fire); }
+    .metric-accent.green { background: var(--green); }
+    .metric-accent.amber { background: var(--amber); }
+    .metric-accent.blue { background: var(--blue); }
+
+    /* ── BUTTONS ─────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      background: var(--fire); color: white; border: none;
+      font-family: var(--font-sans); font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    .btn-primary:hover { background: var(--fire-d); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 12px; border-radius: 8px;
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--text2); font-family: var(--font-sans); font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+    .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-danger {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 7px;
+      background: var(--red-l); border: 1px solid rgba(239,68,68,0.2);
+      color: var(--red); font-family: var(--font-sans); font-size: 11px;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-danger:hover { background: var(--red); color: white; }
+    .inp {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px;
+      color: var(--text); font-family: var(--font-sans); font-size: 12px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .inp:focus { border-color: var(--fire); }
+    .inp::placeholder { color: var(--text3); }
+
+    #map-picker { width:100%; height:200px; border-radius:8px; border:1px solid var(--border); margin-top:8px; }
+
+    /* ── STATUS TAGS ─────────────────────────────────────── */
+    .tag {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 700; padding: 2px 8px;
+      border-radius: 99px; letter-spacing: 0.3px;
+    }
+    .tag-new { background: var(--blue-l); color: var(--blue); }
+    .tag-preparing { background: var(--amber-l); color: var(--amber); }
+    .tag-ready { background: var(--green-l); color: var(--green); }
+    .tag-delivered { background: var(--bg4); color: var(--text3); }
+    .tag-dine { background: var(--blue-l); color: var(--blue); }
+    .tag-takeaway { background: var(--amber-l); color: var(--amber); }
+    .tag-preorder { background: var(--purple-l); color: var(--purple); }
+    .tag-delivery { background: var(--green-l); color: var(--green); }
+    .tag-paid { background: var(--green-l); color: var(--green); }
+    .tag-pending { background: var(--red-l); color: var(--red); }
+    .tag-direct { background: var(--bg4); color: var(--text3); }
+    .tag-manual { background: var(--blue-l); color: var(--blue); }
+    .tag-partner { background: var(--amber-l); color: var(--amber); }
+
+    /* ── DASHBOARD ───────────────────────────────────────── */
+    .dash-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+    .dash-main { display: flex; flex-direction: column; gap: 16px; }
+    .dash-side { display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── OUTLET TOGGLE ───────────────────────────────────── */
+    .outlet-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    /* .outlet-info {} -- removed empty ruleset */
+    .outlet-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .outlet-status { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+    .toggle {
+      width: 46px; height: 24px; border-radius: 99px;
+      background: var(--bg4); border: 1px solid var(--border);
+      position: relative; cursor: pointer; transition: all 0.25s;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--text3); transition: all 0.25s;
+    }
+    .toggle.on { background: var(--green); border-color: var(--green); }
+    .toggle.on::after { left: 24px; background: white; }
+    .toggle-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+    .outlet-reopen { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* ── ORDERS LIST ─────────────────────────────────────── */
+    .orders-list { display: flex; flex-direction: column; gap: 10px; }
+    .order-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      transition: border-color 0.2s;
+    }
+    .order-card:hover { border-color: var(--border2); }
+    .order-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .order-id { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); }
+    .order-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .order-items { font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.5; }
+    .order-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .order-amount { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--fire); }
+    .order-eta { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+
+    /* ── AUDIT LOG ───────────────────────────────────────── */
+    .audit-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+    .audit-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .audit-item:last-child { border-bottom: none; }
+    .audit-main { font-size: 12px; color: var(--text2); }
+    .audit-meta { font-size: 10px; color: var(--text3); font-family: var(--font-mono); margin-top: 2px; }
+
+    /* ── PRINT CONTROLS ──────────────────────────────────── */
+    .print-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .print-note { font-size: 11px; color: var(--text3); }
+
+    /* ── KITCHEN PIPELINE ───────────────────────────────── */
+    .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; height: calc(100dvh - 52px - 44px - 20px); }
+    .pipeline-col {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
+    }
+    .pipeline-head {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .pipeline-title { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .pipeline-title.new { color: var(--blue); }
+    .pipeline-title.preparing { color: var(--amber); }
+    .pipeline-title.ready { color: var(--green); }
+    .pipeline-title.delivered { color: var(--text3); }
+    .pipeline-count {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text3); background: var(--bg4);
+      padding: 1px 7px; border-radius: 99px;
+    }
+    .pipeline-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+    .kitchen-card {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 13px;
+      transition: border-color 0.2s; animation: slideIn 0.2s ease;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+    .kitchen-card:hover { border-color: var(--border2); }
+    .kc-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+    .kc-id { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text); }
+    .kc-customer { font-size: 11px; color: var(--text3); margin-bottom: 6px; font-family: var(--font-mono); }
+    .kc-items { font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.5; }
+    .kc-eta { font-size: 10px; color: var(--text3); font-family: var(--font-mono); margin-bottom: 8px; }
+    .kc-btn {
+      width: 100%; padding: 7px; border-radius: 7px;
+      background: var(--fire-l); border: 1px solid var(--fire-m);
+      color: var(--fire); font-family: var(--font-sans); font-size: 11px;
+      font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .kc-btn:hover { background: var(--fire); color: white; border-color: var(--fire); }
+    .no-orders-msg { font-size: 12px; color: var(--text3); text-align: center; padding: 20px 0; }
+    .kit-date-bar { padding: 10px 22px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+    /* ── TRACKING ─────────────────────────────────────────── */
+    .tracking-controls { padding: 10px 22px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+    .tracking-hint { font-size: 12px; color: var(--text3); }
+    .tracking-nav { display: flex; gap: 6px; }
+    .track-slider { display: grid; grid-auto-flow: column; grid-auto-columns: 320px; gap: 12px; overflow-x: auto; padding: 20px 22px; scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: var(--border) transparent; height: calc(100dvh - 52px - 44px); }
+    .track-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      scroll-snap-align: start; height: fit-content;
+    }
+    .progress-bar { height: 4px; border-radius: 99px; background: var(--bg4); overflow: hidden; margin: 10px 0; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--fire), var(--amber)); border-radius: 99px; transition: width 0.5s; }
+    .progress-info { font-size: 10px; color: var(--text3); font-family: var(--font-mono); }
+
+    /* ── MENU ADMIN ───────────────────────────────────────── */
+    .menu-layout { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+    .menu-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .menu-form-grid .wide { grid-column: span 2; }
+    .menu-form-grid .full { grid-column: 1 / -1; }
+    .menu-tools {
+      display: grid; grid-template-columns: minmax(280px, 1fr) auto;
+      gap: 12px; align-items: center; margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .menu-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .menu-form-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .menu-item-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .menu-item-row:last-child { border-bottom: none; }
+    .menu-item-row:hover { background: var(--bg3); }
+    .menu-thumb {
+      width: 48px; height: 48px; border-radius: 8px;
+      object-fit: cover; border: 1px solid var(--border);
+      background: var(--bg4); flex-shrink: 0;
+    }
+    .menu-thumb-empty {
+      width: 48px; height: 48px; border-radius: 8px;
+      background: var(--bg4); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .menu-info { flex: 1; min-width: 0; }
+    .menu-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .menu-meta { font-size: 11px; color: var(--text3); font-family: var(--font-mono); margin-top: 2px; }
+    .menu-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .menu-actions .inp { width: 132px; font-size: 10px; padding: 5px; }
+    .menu-form-actions button[onclick="deleteMenuItemByInput()"],
+    .menu-form-actions button[onclick="renameMenuItemByInput()"] { display: none; }
+    .state-btn {
+      padding: 5px 9px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg4);
+      color: var(--text3); font-family: var(--font-sans); font-size: 11px;
+      font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .state-btn.avail.active { background: var(--green-l); border-color: rgba(34,197,94,0.3); color: var(--green); }
+    .state-btn.unavail.active { background: var(--red-l); border-color: rgba(239,68,68,0.2); color: var(--red); }
+    .state-btn:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── ORDER LIST SIDEBAR ───────────────────────────────── */
+    .order-list-scroll { max-height: 600px; overflow-y: auto; }
+    .order-list-item {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .order-list-item:last-child { border-bottom: none; }
+    .order-list-item:hover { background: var(--bg3); }
+    .oli-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .oli-id { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text); }
+    .oli-time { font-size: 10px; color: var(--text3); font-family: var(--font-mono); }
+    .oli-items { font-size: 12px; color: var(--text2); margin-bottom: 6px; line-height: 1.4; }
+    .oli-foot { display: flex; align-items: center; justify-content: space-between; }
+    .oli-total { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--fire); }
+
+    /* ── HISTORY ─────────────────────────────────────────── */
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th {
+      position: sticky; top: 0; background: var(--bg3); z-index: 1;
+      text-align: left; padding: 10px 14px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; color: var(--text3);
+      border-bottom: 1px solid var(--border);
+    }
+    .history-table th.r, .history-table td.r { text-align: right; }
+    .history-table td {
+      padding: 10px 14px; font-size: 12px; color: var(--text2);
+      border-bottom: 1px solid var(--border);
+    }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: var(--bg3); color: var(--text); }
+    .history-table td.mono { font-family: var(--font-mono); color: var(--text); }
+    .history-table td.amount { font-family: var(--font-mono); color: var(--fire); font-weight: 600; }
+
+    /* ── RECEIPT ─────────────────────────────────────────── */
+    .receipt {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .receipt-header {
+      background: var(--bg4); padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    }
+    .receipt-brand { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--text); }
+    .receipt-invoice { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-top: 2px; }
+    .receipt-body { padding: 14px 16px; }
+    .receipt-meta { background: var(--bg4); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+    .receipt-meta-row { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; margin-bottom: 4px; }
+    .receipt-meta-row:last-child { margin-bottom: 0; }
+    .receipt-meta-row .k { color: var(--text3); }
+    .receipt-meta-row .v { color: var(--text); font-weight: 600; font-family: var(--font-mono); }
+    .receipt-divider { height: 1px; background: var(--border); margin: 10px 0; }
+    .r-grid-head, .r-grid-row { display: grid; grid-template-columns: 1fr 40px 70px 80px; gap: 6px; }
+    .r-grid-head { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text3); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+    .r-grid-row { font-size: 12px; color: var(--text2); padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .r-grid-row:last-child { border-bottom: none; }
+    .r-grid-head span:not(:first-child), .r-grid-row span:not(:first-child) { text-align: right; }
+    .r-tot-line { display: flex; justify-content: space-between; font-size: 12px; color: var(--text3); margin-bottom: 3px; }
+    .r-tot-line .v { font-family: var(--font-mono); color: var(--text2); }
+    .r-grand { display: flex; justify-content: space-between; background: var(--fire-l); border: 1px solid var(--fire-m); border-radius: 8px; padding: 10px 12px; font-size: 14px; font-weight: 700; color: var(--fire); margin-top: 8px; }
+    .r-grand .v { font-family: var(--font-mono); }
+    .receipt-foot { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); font-family: var(--font-mono); display: flex; align-items: center; justify-content: space-between; }
+
+    /* ── TABLE STATUS (in dashboard) ─────────────────────── */
+    .table-status-list { display: flex; flex-direction: column; }
+    .tsl-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .tsl-item:last-child { border-bottom: none; }
+    .tsl-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .tsl-status { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+    .tsl-actions { display: flex; gap: 5px; }
+    .tsl-btn {
+      padding: 4px 9px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg4);
+      color: var(--text3); font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tsl-btn.free.active { background: var(--bg4); border-color: var(--border2); color: var(--text); }
+    .tsl-btn.ordering.active { background: var(--amber-l); border-color: rgba(245,158,11,0.3); color: var(--amber); }
+    .tsl-btn.occupied.active { background: var(--green-l); border-color: rgba(34,197,94,0.3); color: var(--green); }
+    .tsl-btn:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── TABLE GRID ──────────────────────────────────────── */
+    .table-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .table-cell {
+      aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; cursor: pointer; transition: all 0.15s;
+      background: var(--bg4);
+    }
+    .table-cell:hover { border-color: var(--border2); }
+    .table-cell .tc-num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+    .table-cell .tc-st { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 2px; }
+    .table-cell.free .tc-num { color: var(--text3); }
+    .table-cell.free .tc-st { color: var(--text3); }
+    .table-cell.ordering { background: var(--amber-l); border-color: rgba(245,158,11,0.3); }
+    .table-cell.ordering .tc-num { color: var(--amber); }
+    .table-cell.ordering .tc-st { color: var(--amber); }
+    .table-cell.occupied { background: var(--green-l); border-color: rgba(34,197,94,0.3); }
+    .table-cell.occupied .tc-num { color: var(--green); }
+    .table-cell.occupied .tc-st { color: var(--green); }
+
+    /* ── ORDERING PANEL ──────────────────────────────────── */
+    .ordering-panel { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .op-title { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.3px; }
+    .op-cat { margin-bottom: 12px; }
+    .op-cat:last-child { margin-bottom: 0; }
+    .op-cat-name { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+    .manual-pos-layout {
+      display: grid;
+      grid-template-columns: 178px minmax(0, 1fr);
+      min-height: 520px;
+    }
+    .manual-category-sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg3);
+      overflow: auto;
+      max-height: calc(100dvh - 320px);
+    }
+    .manual-items-panel {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .manual-search-row {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 120px;
+      gap: 10px;
+      background: var(--bg2);
+    }
+    .manual-cat-grid {
+      display: flex;
+      flex-direction: column;
+    }
+    .manual-cat-btn {
+      width: 100%; min-height: 54px; border-radius: 0; border: 0;
+      border-bottom: 1px solid var(--border);
+      background: transparent; color: var(--text);
+      padding: 12px 14px; text-align: left; cursor: pointer;
+      display: flex; flex-direction: column; justify-content: center; gap: 4px;
+      transition: all 0.15s; font-family: var(--font-sans);
+    }
+    .manual-cat-btn:hover { background: var(--bg4); }
+    .manual-cat-btn.active {
+      background: var(--fire-l);
+      box-shadow: inset 4px 0 0 var(--fire);
+    }
+    .manual-cat-name {
+      font-size: 14px; font-weight: 800; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      text-transform: capitalize;
+    }
+    .manual-cat-count { font-size: 10px; font-weight: 700; color: var(--text3); font-family: var(--font-mono); }
+    .manual-item-section { padding: 14px; }
+    .manual-item-section + .manual-item-section { border-top: 1px solid var(--border); }
+    .manual-section-title {
+      font-size: 11px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: .7px; color: var(--text3); margin-bottom: 10px;
+    }
+    .manual-item-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .manual-item-card {
+      position: relative;
+      min-height: 106px;
+      border: 1px solid var(--border);
+      border-left: 4px solid #14b8a6;
+      background: var(--bg2);
+      border-radius: 4px;
+      padding: 13px 12px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 6px 16px rgba(15,23,42,0.05);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    .manual-item-card:hover {
+      border-color: var(--fire-m);
+      box-shadow: 0 10px 22px rgba(15,23,42,0.09);
+      transform: translateY(-1px);
+    }
+    .manual-item-card.selected {
+      border-color: var(--fire);
+      border-left-color: var(--fire);
+      background: #fff7ed;
+      box-shadow: inset 0 0 0 1px var(--fire-m), 0 10px 22px rgba(249,115,22,0.13);
+    }
+    .manual-item-name {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.22;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+    .manual-item-price {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text3);
+      font-family: var(--font-mono);
+    }
+    .manual-item-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .op-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; }
+    .op-item-name { font-size: 12px; color: var(--text2); flex: 1; }
+    .op-qty { display: flex; align-items: center; gap: 6px; }
+    .op-qty-btn {
+      width: 24px; height: 24px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--bg4);
+      color: var(--text2); font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    .op-qty-btn:hover { background: var(--fire-l); border-color: var(--fire-m); color: var(--fire); }
+    .op-qty-val { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text); min-width: 18px; text-align: center; }
+    .op-footer { padding-top: 10px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+    .op-count { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+
+    /* ── MODAL ─────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px); display: none; z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      width: min(400px, calc(100vw - 32px));
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .modal-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .modal-desc { font-size: 13px; color: var(--text2); margin-bottom: 16px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* ── DELIVERY SECTION in receipt ─────────────────────── */
+    .delivery-block {
+      background: var(--green-l); border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+    }
+    .delivery-block-title { font-size: 11px; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+
+    /* ── DATE FILTER BAR ─────────────────────────────────── */
+    .filter-bar { display: flex; align-items: center; gap: 8px; }
+    .filter-date {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; color: var(--text);
+      font-family: var(--font-mono); font-size: 12px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-date:focus { border-color: var(--fire); }
+    .filter-date::-webkit-calendar-picker-indicator { filter: invert(0.5); }
+
+    /* ── RESPONSIVE ─────────────────────────────────────── */
+    @media (max-width: 960px) {
+      body { overflow: auto; }
+      #app.visible { flex-direction: column; height: auto; }
+      #sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      .nav { display: flex; flex-direction: row; overflow-x: auto; padding: 0; }
+      .nav-section-label { display: none; }
+      .nav-item { padding: 14px 16px; border-left: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+      .nav-item.active { border-bottom-color: var(--fire); border-left: none; background: none; }
+      #main { height: auto; }
+      .content { overflow: visible; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .dash-grid { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: 1fr; height: auto; }
+      .menu-layout { grid-template-columns: 1fr; }
+      .manual-pos-layout { grid-template-columns: 150px minmax(0, 1fr); }
+      .menu-form-grid { grid-template-columns: 1fr 1fr; }
+      .menu-form-grid .wide, .menu-form-grid .full { grid-column: 1 / -1; }
+      .menu-tools { grid-template-columns: 1fr; }
+      .table-grid { grid-template-columns: repeat(4, 1fr); }
+      .kit-date-bar, .tracking-controls { padding: 10px 14px; }
+      .track-slider { padding: 14px; grid-auto-columns: min(320px, 90vw); }
+      .content-inner { padding: 14px; }
+    }
+    @media (max-width: 600px) {
+      #auth-gate { align-items: flex-start; overflow: auto; padding: 18px 0; }
+      .auth-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .table-grid { grid-template-columns: repeat(3, 1fr); }
+      .menu-form-grid { grid-template-columns: 1fr; }
+      .menu-form-grid .wide, .menu-form-grid .full { grid-column: 1 / -1; }
+      .menu-tools { grid-template-columns: 1fr; }
+      .manual-pos-layout { grid-template-columns: 1fr; }
+      .manual-category-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        max-height: none;
+        overflow-x: auto;
+      }
+      .manual-cat-grid { flex-direction: row; }
+      .manual-cat-btn {
+        width: 150px;
+        min-width: 150px;
+        border-right: 1px solid var(--border);
+      }
+      .manual-cat-btn.active { box-shadow: inset 0 -4px 0 var(--fire); }
+      .manual-search-row { grid-template-columns: 1fr; }
+      .sb-footer-btns { flex-direction: row; }
+      .pipeline { gap: 10px; }
+    }
+
+    /* ── SCROLLBAR ─────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+  </style>
+</head>
+<body>
+
+
+<!-- ── AUTH GATE ─────────────────────────────────────────── -->
+<div id="auth-gate">
+  <div class="auth-wrap">
+    <div class="auth-logo">Table<span>side</span></div>
+    <div class="auth-sub">Management portal — login or register</div>
+    <div class="auth-grid">
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="auth-tab-login" onclick="setAuthMode('login')">Login</button>
+          <button class="auth-tab" id="auth-tab-register" onclick="setAuthMode('register')">Register</button>
+        </div>
+
+        <div class="auth-panel active" id="auth-panel-login">
+          <input class="auth-inp" id="login-restaurant" placeholder="Restaurant name or code" />
+          <input class="auth-inp" id="login-username" placeholder="Username (optional for staff)" />
+          <input class="auth-inp" id="login-password" type="password" placeholder="Password" />
+          <button class="auth-submit" onclick="loginManagement()">Sign In →</button>
+          <div class="auth-err" id="login-error"></div>
+        </div>
+
+        <div class="auth-panel" id="auth-panel-register">
+          <input class="auth-inp" id="register-restaurant" placeholder="Restaurant code (e.g. gandikotadosa)" />
+          <input class="auth-inp" id="register-restaurant-name" placeholder="Display name (e.g. Gandikota Dosa)" />
+          <input class="auth-inp" id="register-password" type="password" placeholder="Password" />
+          <input class="auth-inp" id="register-confirm-password" type="password" placeholder="Confirm password" />
+          <input class="auth-inp" id="register-setup-key" type="password" placeholder="Setup key (required after first account)" />
+          <button class="auth-submit" onclick="registerManagement()">Register & Sign In →</button>
+          <div class="auth-err" id="register-error"></div>
+          <div class="auth-note" id="register-note"></div>
+        </div>
+      </div>
+      <div class="auth-card">
+        <div class="auth-list-head">
+          <div class="auth-list-title">Available restaurants</div>
+          <button class="auth-list-refresh" onclick="loadAvailableRestaurants()">Refresh</button>
+        </div>
+        <div class="restaurant-list" id="available-restaurants">
+          <div class="restaurant-empty">Loading restaurants...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP ──────────────────────────────────────────────── -->
+<div id="app">
+  <aside id="sidebar">
+    <div class="sb-logo">
+      <div class="sb-brand">Table<span>side</span></div>
+      <div class="sb-label">Management</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section-label">Operations</div>
+      <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" data-view="kitchen" onclick="switchView('kitchen',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 6M18 6a2 2 0 110 4H6a2 2 0 110-4"/><path d="M9 10v8M15 10v8"/><path d="M3 18h18"/></svg>
+        Kitchen
+        <span class="nav-badge" id="k-badge">0</span>
+      </div>
+      <div class="nav-item" data-view="manual" onclick="switchView('manual',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11h6"/><path d="M9 15h6"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M14 3v5h5"/></svg>
+        Manual Order
+      </div>
+      <div class="nav-item" data-view="tracking" onclick="switchView('tracking',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Tracking
+      </div>
+      <div class="nav-section-label">Setup</div>
+      <div class="nav-item" data-view="menu" onclick="switchView('menu',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+        Menu
+      </div>
+      <div class="nav-item" data-view="history" onclick="switchView('history',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 16v-5h5"/></svg>
+        History
+      </div>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-chip" id="rest-chip">Restaurant</div>
+      <div class="sb-footer-btns">
+        <button class="sb-btn" onclick="openOuterScreen()">🖥 Screen</button>
+        <button class="sb-btn" onclick="logoutManagement()">↩ Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div class="topbar">
+      <div class="tb-title" id="tb-title">Dashboard</div>
+      <div class="tb-right">
+        <button class="sound-btn" id="outlet-live-btn" onclick="toggleOutletStatus()">Live: ...</button>
+        <button class="sound-btn" id="order-sound-btn" onclick="toggleOrderSound()">Sound</button>
+        <div class="live-indicator"><div class="live-dot"></div>LIVE</div>
+        <div id="clock"></div>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ─────────────────────────────────────── -->
+    <section class="content active" id="view-dashboard">
+      <div class="content-inner">
+        <!-- Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-accent fire"></div><div class="metric-label">Overdue Orders</div><div class="metric-value" id="m-active">0</div><div class="metric-sub" id="m-overdue">0 active</div></div>
+          <div class="metric-card"><div class="metric-accent green"></div><div class="metric-label">Delivered Today</div><div class="metric-value" id="m-tables">0</div><div class="metric-sub">Completed orders</div></div>
+          <div class="metric-card"><div class="metric-accent amber"></div><div class="metric-label">Active Orders</div><div class="metric-value" id="m-wait">0</div><div class="metric-sub">Not yet delivered</div></div>
+          <div class="metric-card"><div class="metric-accent blue"></div><div class="metric-label">Revenue</div><div class="metric-value" id="m-revenue">₹0</div><div class="metric-sub">Paid orders only</div></div>
+        </div>
+
+        <!-- Date filter -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <div style="font-size:12px;color:var(--text3);">Showing metrics for:</div>
+          <div class="filter-bar">
+            <input class="filter-date" id="dashboard-date-filter" type="date" onchange="renderDashboard()" />
+            <button class="btn-ghost" onclick="clearDashboardDateFilter()">All Dates</button>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="dash-main">
+            <!-- Outlet Toggle -->
+            <div class="card">
+              <div class="card-head">
+                <div class="card-title">Outlet Status</div>
+              </div>
+              <div class="card-body">
+                <div class="outlet-row">
+                  <div class="outlet-info">
+                    <div class="outlet-name">Accept new orders</div>
+                    <div class="outlet-status" id="outlet-status-note">Loading…</div>
+                  </div>
+                  <div class="toggle-wrap">
+                    <div class="toggle" id="outlet-open-switch" onclick="toggleOutletStatus()"></div>
+                    <span class="toggle-label" id="outlet-open-label">Closed</span>
+                  </div>
+                </div>
+                <div class="outlet-reopen">
+                  <input class="inp" style="flex:1;" id="outlet-reopen-note" placeholder="Back online at (e.g. 5:30 PM)" />
+                  <button class="btn-ghost" onclick="saveOutletStatusNote()">Save</button>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;margin-top:12px;">
+                  <div id="restaurant-image-preview" style="width:84px;height:84px;border-radius:8px;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--text3);">No image</div>
+                  <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+                    <input class="inp" id="restaurant-name-input" placeholder="Outlet display name" />
+                    <input class="inp" id="restaurant-address-input" placeholder="Address / location" />
+                    <div style="display:flex;gap:8px;margin-top:6px;">
+                      <input class="inp" id="restaurant-lat-input" placeholder="Latitude" style="width:140px;" />
+                      <input class="inp" id="restaurant-lng-input" placeholder="Longitude" style="width:140px;" />
+                      <button class="btn-ghost" onclick="useMyLocation()">Use my location</button>
+                    </div>
+                    <div id="map-picker"></div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                      <input id="restaurant-image-input" type="file" accept="image/*" style="flex:1;" onchange="onRestaurantImageSelected(event)" />
+                      <button class="btn-ghost" onclick="saveRestaurantDetails()">Save Details</button>
+                    </div>
+                  </div>
+                  <div id="management-users-panel" style="margin-top:12px;display:block;">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Management Users</div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                      <input class="inp" id="new-user-username" placeholder="Username (eg. staff1)" />
+                      <input class="inp" id="new-user-password" placeholder="Password" type="password" />
+                      <select id="new-user-role" class="inp" style="width:110px;margin-left:4px;">
+                        <option value="staff">Staff</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                      <button class="btn-ghost" onclick="createManagementUser()">Add User</button>
+                    </div>
+                    <div id="management-users-list" style="font-size:13px;color:var(--text2)">Loading users…</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Recent Orders</div></div>
+              <div class="card-body">
+                <div class="orders-list" id="recent"></div>
+              </div>
+            </div>
+
+            <!-- Print Controls -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Print Controls</div></div>
+              <div class="card-body">
+                <div class="print-row">
+                  <button class="btn-ghost" id="auto-print-toggle" onclick="toggleAutoPrint()">Auto Print: Off</button>
+                  <button class="btn-ghost" onclick="printLatestOrder()">🖨 Print Latest</button>
+                  <span class="print-note">Launch with Chrome kiosk printing for silent receipts.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-side">
+            <!-- Table Controls -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Tables</div></div>
+              <div class="card-body">
+                <div class="print-row" style="margin-bottom:12px;">
+                  <button class="btn-primary" onclick="addTable()">+ Add Table</button>
+                  <input class="inp" id="remove-table-number" type="number" min="1" placeholder="Table no." style="width:110px;" />
+                  <button class="btn-ghost" onclick="removeTable()">Remove</button>
+                </div>
+                <div class="table-grid" id="tables"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><div class="card-title">Table Status</div></div>
+              <div class="card-body">
+                <div class="table-status-list" id="dashboard-table-status-list"></div>
+              </div>
+            </div>
+
+            <div id="ordering-menu-panel"></div>
+
+            <!-- Activity Log -->
+            <div class="card">
+              <div class="card-head"><div class="card-title">Activity Log</div></div>
+              <div class="card-body" style="padding-top:8px;">
+                <div class="audit-list" id="audit-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── KITCHEN ─────────────────────────────────────────── -->
+    <section class="content" id="view-manual">
+      <div class="content-inner">
+        <div class="menu-layout">
+          <div>
+            <div class="card">
+              <div class="card-head"><div class="card-title">Manual Counter Order</div></div>
+              <div class="card-body">
+                <div class="menu-form-grid">
+                  <input class="inp" id="manual-customer-name" placeholder="Customer name (optional)" />
+                  <input class="inp" id="manual-customer-mobile" placeholder="Mobile (optional)" />
+                  <select class="inp" id="manual-order-type" onchange="renderManualOrder()">
+                    <option value="takeaway">Takeaway</option>
+                    <option value="dine">Dine-in</option>
+                  </select>
+                  <input class="inp" id="manual-table-number" type="number" min="1" placeholder="Table no. (optional)" />
+                  <select class="inp" id="manual-payment-method">
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                  </select>
+                  <input class="inp wide" id="manual-notes" placeholder="Notes (optional)" />
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <div class="card-head"><div class="card-title">Add Items</div></div>
+              <div class="manual-pos-layout">
+                <aside class="manual-category-sidebar" id="manual-category-buttons"></aside>
+                <div class="manual-items-panel">
+                  <div class="manual-search-row">
+                    <input class="inp" id="manual-menu-search" placeholder="Search item" oninput="renderManualOrder()" />
+                    <input class="inp" id="manual-short-code" placeholder="Short code" oninput="renderManualOrder()" />
+                  </div>
+                  <div id="manual-menu-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card" style="position:sticky;top:22px;">
+              <div class="card-head"><div class="card-title">Bill Preview</div></div>
+              <div id="manual-order-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content" id="view-kitchen">
+      <div class="kit-date-bar">
+        <div class="filter-bar">
+          <input class="filter-date" id="kitchen-date-filter" type="date" onchange="renderKitchen()" />
+          <button class="btn-ghost" onclick="clearKitchenDateFilter()">All Dates</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="kitchen-delivery-only" onchange="renderKitchen()" style="cursor:pointer;" />
+          <label for="kitchen-delivery-only" style="font-size:12px;color:var(--text3);cursor:pointer;user-select:none;">Delivery orders only</label>
+        </div>
+      </div>
+      <div class="content-inner" style="height:calc(100% - 44px);overflow:hidden;">
+        <div class="pipeline">
+          <div class="pipeline-col">
+            <div class="pipeline-head"><div class="pipeline-title new">New</div><div class="pipeline-count" id="c-new">0</div></div>
+            <div class="pipeline-body" id="l-new"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-head"><div class="pipeline-title preparing">Preparing</div><div class="pipeline-count" id="c-preparing">0</div></div>
+            <div class="pipeline-body" id="l-preparing"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-head"><div class="pipeline-title ready">Ready</div><div class="pipeline-count" id="c-ready">0</div></div>
+            <div class="pipeline-body" id="l-ready"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-head"><div class="pipeline-title delivered">Delivered</div><div class="pipeline-count" id="c-delivered">0</div></div>
+            <div class="pipeline-body" id="l-delivered"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TRACKING ─────────────────────────────────────────── -->
+    <section class="content" id="view-tracking">
+      <div class="tracking-controls">
+        <div class="tracking-hint">Live order tracking — slide or use arrows</div>
+        <div class="tracking-nav">
+          <button class="btn-ghost" onclick="scrollTracking(-1)">← Prev</button>
+          <button class="btn-ghost" onclick="scrollTracking(1)">Next →</button>
+        </div>
+      </div>
+      <div class="track-slider" id="tslider"></div>
+    </section>
+
+    <!-- ── MENU ─────────────────────────────────────────────── -->
+    <section class="content" id="view-menu">
+      <div class="content-inner">
+        <div class="menu-layout">
+          <div>
+            <!-- Add Item Form -->
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-head"><div class="card-title">Add / Edit Menu Items</div></div>
+              <div class="card-body">
+                <div class="menu-form-grid">
+                  <input class="inp wide" id="menu-name" placeholder="Food name" />
+                  <input class="inp" id="menu-price" type="number" min="1" placeholder="Price (₹)" />
+                  <input class="inp" id="menu-cat" placeholder="Category (mains/drinks…)" />
+                  <input class="inp" id="menu-emoji" placeholder="Emoji (optional)" />
+                  <input class="inp wide" id="menu-desc" placeholder="Description (optional)" />
+                  <input class="inp" id="menu-image-file" type="file" accept="image/*" />
+                  <div class="full" style="font-size:11px;color:var(--text3);">Use the menu list below to update, delete, set availability, and add item photos.</div>
+                </div>
+                <div class="menu-form-actions">
+                  <div style="font-size:11px;color:var(--text3);">New items are saved to the database immediately.</div>
+                  <div class="menu-form-btns">
+                  </div>
+                </div>
+                <div class="menu-tools">
+                  <input class="inp" id="menu-csv-file" type="file" accept=".csv,text/csv" onchange="previewMenuCsv()" />
+                  <div id="csv-drop" style="
+                    border:2px dashed var(--border);
+                    padding:16px;
+                    text-align:center;
+                    border-radius:10px;
+                    cursor:pointer;
+                  ">
+                    Drop CSV here or click
+                  </div>
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);cursor:pointer;">
+                    <input id="menu-csv-replace" type="checkbox" /> Replace existing menu on import
+                  </label>
+                </div>
+                <div class="menu-form-actions">
+                  <div class="menu-form-btns">
+                    <button class="btn-primary" onclick="addMenuItem()">+ Add Item</button>
+                    <button class="btn-ghost" onclick="deleteMenuItemByInput()">− Delete</button>
+                    <button class="btn-ghost" onclick="renameMenuItemByInput()">✏ Rename</button>
+                    <button class="btn-ghost" onclick="importMenuCsv()">↑ Import CSV</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Menu List -->
+            <div class="card">
+              <div class="card-head" style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+                <div class="card-title">Menu Items</div>
+                <div class="search-bar" style="flex:1; max-width:300px;">
+                  <input class="inp" id="menu-item-search" type="text" placeholder="Search menu items..." oninput="renderMenuManagement()" style="width:100%; padding:6px 12px; font-size:12px;" />
+                </div>
+              </div>
+              <div id="menu-admin-list"></div>
+            </div>
+          </div>
+
+          <!-- Order Sidebar -->
+          <div>
+            <div class="card" style="position:sticky;top:22px;">
+              <div class="card-head">
+                <div class="card-title">Order List</div>
+                <div class="filter-bar">
+                  <input class="filter-date" id="menu-orders-date-filter" type="date" onchange="renderMenuOrders()" />
+                  <button class="btn-ghost" onclick="clearMenuOrdersDateFilter()">All</button>
+                </div>
+              </div>
+              <div class="order-list-scroll" id="menu-order-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HISTORY ─────────────────────────────────────────── -->
+    <section class="content" id="view-history">
+      <div class="content-inner">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Order History</div>
+            <div class="filter-bar">
+              <input class="filter-date" id="history-export-date" type="date" onchange="renderHistoryTable()" />
+              <button class="btn-primary" onclick="downloadHistoryByDateExcel()">↓ Export Excel</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;max-height:calc(100dvh - 52px - 80px);overflow-y:auto;">
+            <div id="history-order-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ── MODAL ─────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="remove-modal">
+  <div class="modal-card">
+    <div class="modal-title">Remove Table</div>
+    <div class="modal-desc" id="remove-modal-text">Are you sure?</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeRemoveModal()">Cancel</button>
+      <button class="btn-danger" onclick="confirmRemoveTable()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+    // ── TABLES FEATURE FLAG ───────────────────────────────────────
+    // Set this to false to hide all table-related UI
+    const tablesEnabled = false;
+    function updateTablesUI() {
+      document.querySelectorAll('.table-group, #table-group').forEach(el => {
+        el.style.display = tablesEnabled ? '' : 'none';
+      });
+    }
+    window.addEventListener('DOMContentLoaded', updateTablesUI);
+  // ── STATE ────────────────────────────────────────────────
+  const MGMT_TOKEN_KEY = 'mgmt_auth_token';
+  const AUTO_PRINT_KEY = 'mgmt_auto_print';
+  const ORDER_SOUND_KEY = 'mgmt_order_sound';
+  const PARCEL_CHARGE_AMOUNT = 5;
+  let state = { menu: [], tables: [], orders: [], stats: {}, restaurant: null };
+  let auditLogs = [];
+  let managementAuth = null;
+  let pollTimer = null;
+  let pendingRemoveTableNumber = null;
+  let selectedOrderingTableNumber = null;
+  let autoPrintEnabled = true;
+  let knownOrderIds = new Set();
+  let knownPaidOrderIds = new Set();
+  let autoPrintQueue = [];
+  let isAutoPrinting = false;
+  let autoPrintPopupBlockedNotified = false;
+  let orderSoundEnabled = true;
+  let orderSoundContext = null;
+  let manualOrderDraft = {};
+  let manualSelectedCategory = 'all';
+  const tableOrderDrafts = {};
+  let outletOpen = true;
+  let csvPreviewItems = null;
+  let csvPreviewErrors = [];
+
+  function money(v) {
+    return `₹${Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  }
+
+  function showToast(msg, color = '#22c55e') {
+    const t = document.createElement('div');
+    t.innerText = msg;
+    Object.assign(t.style, {
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      background: color,
+      color: '#fff',
+      padding: '10px 16px',
+      borderRadius: '8px',
+      fontSize: '12px',
+      zIndex: 9999
+    });
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  function esc(v) {
+    return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function escAttr(v) {
+    return esc(v).replace(/`/g, '&#96;');
+  }
+
+  function getOrderSoundContext() {
+    if (!orderSoundContext) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      orderSoundContext = new AudioContextClass();
+    }
+    return orderSoundContext;
+  }
+
+  async function unlockOrderSound(playTest = false) {
+    const ctx = getOrderSoundContext();
+    if (!ctx) return false;
+    try {
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (playTest) playOrderSound();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function renderOrderSoundControl() {
+    const btn = document.getElementById('order-sound-btn');
+    if (!btn) return;
+    btn.textContent = `Sound: ${orderSoundEnabled ? 'On' : 'Off'}`;
+    btn.classList.toggle('active', orderSoundEnabled);
+  }
+
+  async function toggleOrderSound() {
+    orderSoundEnabled = !orderSoundEnabled;
+    try { localStorage.setItem(ORDER_SOUND_KEY, orderSoundEnabled ? '1' : '0'); } catch {}
+    renderOrderSoundControl();
+    if (orderSoundEnabled) {
+      const unlocked = await unlockOrderSound(true);
+      if (!unlocked) showToast('Browser blocked sound. Click Sound again.', '#f59e0b');
+    }
+  }
+
+  function playTone(ctx, start, frequency, duration, gainValue = 0.18) {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.03);
+  }
+
+  function playOrderSound() {
+    if (!orderSoundEnabled) return;
+    const ctx = getOrderSoundContext();
+    if (!ctx || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    playTone(ctx, now, 880, 0.18);
+    playTone(ctx, now + 0.2, 1175, 0.24);
+  }
+
+  function notifyPaidOrders(orders) {
+    const count = (orders || []).length;
+    if (!count) return;
+    playOrderSound();
+    showToast(`${count} paid order${count > 1 ? 's' : ''} ready to print`, '#22c55e');
+  }
+
+  function restaurantUrl(code) {
+    return `/${encodeURIComponent(String(code || 'default').trim() || 'default')}#order`;
+  }
+
+  function chooseRestaurantForLogin(code) {
+    const value = String(code || '').trim();
+    if (!value) return;
+    document.getElementById('login-restaurant').value = value;
+    setAuthMode('login');
+    document.getElementById('login-password')?.focus();
+  }
+
+  function renderAvailableRestaurants(restaurants) {
+    const box = document.getElementById('available-restaurants');
+    if (!box) return;
+    if (!restaurants.length) {
+      box.innerHTML = '<div class="restaurant-empty">No restaurants found. Register the first restaurant to create it.</div>';
+      return;
+    }
+    box.innerHTML = restaurants.map((restaurant) => {
+      const code = String(restaurant.code || 'default').trim() || 'default';
+      const open = restaurant.acceptingOrders !== false;
+      return `
+        <div class="restaurant-row">
+          <div class="restaurant-row-top">
+            <div>
+              <div class="restaurant-row-name">${esc(restaurant.name || code || 'Restaurant')}</div>
+              <div class="restaurant-row-code">${esc(code)}</div>
+            </div>
+            <div class="restaurant-status ${open ? 'open' : 'closed'}">${open ? 'Open' : 'Closed'}</div>
+          </div>
+          <div class="restaurant-row-meta">${esc(restaurant.address || 'No address')} · ${esc(restaurant.cuisines || 'Cuisine not set')}</div>
+          <div class="restaurant-row-actions">
+            <a href="${restaurantUrl(code)}" target="_blank" rel="noopener">Client</a>
+            <button onclick="chooseRestaurantForLogin('${esc(code)}')">Manage</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function loadAvailableRestaurants() {
+    const box = document.getElementById('available-restaurants');
+    if (box) box.innerHTML = '<div class="restaurant-empty">Loading restaurants...</div>';
+    try {
+      const res = await fetch('/api/public/restaurants', { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error('Failed to load restaurants');
+      const data = await res.json();
+      renderAvailableRestaurants(Array.isArray(data?.restaurants) ? data.restaurants : []);
+    } catch (error) {
+      if (box) box.innerHTML = `<div class="restaurant-empty">${esc(error.message || 'Failed to load restaurants')}</div>`;
+    }
+  }
+
+  function orderSubtotal(o) {
+    const computed = (o.items||[]).reduce((s,i)=>s+Number(i.price||0)*Number(i.qty||0),0);
+    return Number(o.subtotal||computed);
+  }
+
+  function orderParcelCharge(o) {
+    return Number(o?.parcelCharge || (o?.orderType === 'takeaway' ? PARCEL_CHARGE_AMOUNT : 0));
+  }
+
+  // ── AUTH ─────────────────────────────────────────────────
+  function setAuthMode(mode) {
+    ['login','register'].forEach(m => {
+      document.getElementById(`auth-tab-${m}`).classList.toggle('active', m===mode);
+      document.getElementById(`auth-panel-${m}`).classList.toggle('active', m===mode);
+    });
+  }
+
+  async function loginManagement() {
+    unlockOrderSound(false);
+    const restaurant = document.getElementById('login-restaurant').value.trim();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+    const err = document.getElementById('login-error');
+    err.textContent = '';
+    if (!restaurant || !password) { err.textContent = 'Restaurant and password required.'; return; }
+    try {
+      const body = { restaurant, password };
+      if (username) body.username = username;
+      const res = await fetch('/api/management/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.error||'Login failed');
+      managementAuth = { token: data.token, restaurant: data.restaurant, role: data.role || 'owner', username: data.username || username || 'owner' };
+      localStorage.setItem(MGMT_TOKEN_KEY, JSON.stringify(managementAuth));
+      document.getElementById('login-password').value = '';
+      await startSession();
+    } catch(e) { err.textContent = e.message||'Login failed'; }
+  }
+
+  async function registerManagement() {
+    const restaurant = document.getElementById('register-restaurant').value.trim();
+    const restaurantName = document.getElementById('register-restaurant-name').value.trim();
+    const password = document.getElementById('register-password').value.trim();
+    const confirm = document.getElementById('register-confirm-password').value.trim();
+    const setupKey = document.getElementById('register-setup-key').value.trim();
+    const err = document.getElementById('register-error');
+    const note = document.getElementById('register-note');
+    err.textContent = ''; note.textContent = '';
+    if (!restaurant || !password || !confirm) { err.textContent = 'All fields required.'; return; }
+    if (password.length < 6) { err.textContent = 'Password must be ≥ 6 chars.'; return; }
+    if (password !== confirm) { err.textContent = 'Passwords do not match.'; return; }
+    try {
+      const payload = { restaurant, restaurantName: restaurantName||restaurant, password };
+      if (setupKey) payload.setupKey = setupKey;
+      const res = await fetch('/api/management/register', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data.error||'Registration failed');
+      note.textContent = 'Registered! Logging in…';
+      document.getElementById('login-restaurant').value = restaurant;
+      document.getElementById('login-password').value = password;
+      setAuthMode('login');
+      await loadAvailableRestaurants();
+      // call login and then set role from response
+      await loginManagement();
+    } catch(e) { err.textContent = e.message||'Registration failed'; }
+  }
+
+  function logoutManagement() {
+    localStorage.removeItem(MGMT_TOKEN_KEY);
+    showLoginGate('Logged out.');
+  }
+
+  function showLoginGate(msg='') {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer=null; }
+    managementAuth = null;
+    document.getElementById('auth-gate').style.display = 'flex';
+    document.getElementById('app').classList.remove('visible');
+    setAuthMode('login');
+    loadAvailableRestaurants();
+    if (msg) document.getElementById('login-error').textContent = msg;
+  }
+
+  function showApp() {
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    document.getElementById('rest-chip').textContent = managementAuth?.restaurant?.name || 'Restaurant';
+  }
+
+  // ── API ──────────────────────────────────────────────────
+  async function api(path, method='GET', body) {
+    const headers = { 'Content-Type':'application/json', 'X-Actor':'management-ui' };
+    if (managementAuth?.token) headers.Authorization = `Bearer ${managementAuth.token}`;
+    const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (res.status === 401) {
+      localStorage.removeItem(MGMT_TOKEN_KEY);
+      showLoginGate('Session expired. Please login.');
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||'Request failed'); }
+    return res.json();
+  }
+
+  async function apiUploadImage(path, file) {
+    const headers = { 'X-Actor':'management-ui' };
+    if (managementAuth?.token) headers.Authorization = `Bearer ${managementAuth.token}`;
+    const form = new FormData(); form.append('image', file);
+    const res = await fetch(path, { method:'POST', headers, body:form });
+    if (res.status===401) {
+      localStorage.removeItem(MGMT_TOKEN_KEY);
+      showLoginGate('Session expired.');
+      throw new Error('Unauthorized');
+    }
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||'Upload failed'); }
+    return res.json();
+  }
+
+  // ── SESSION ──────────────────────────────────────────────
+  async function fetchState() {
+    const data = await api('/api/management/state');
+    state = data;
+    renderAll();
+    knownOrderIds = new Set((data.orders||[]).map(o=>o.id));
+    knownPaidOrderIds = new Set((data.orders||[]).filter(o=>Number(o.paid)===1).map(o=>o.id));
+  }
+
+  async function startSession() {
+    showApp();
+    await fetchState();
+    await loadAuditLogs();
+    await loadManagementUsers();
+    if (pollTimer) clearInterval(pollTimer);
+    // initialize map picker after state loads
+    setTimeout(() => { initMapPicker(); }, 300);
+    pollTimer = setInterval(async()=>{
+      const prevPaid = knownPaidOrderIds;
+      try {
+        await fetchState();
+        await loadAuditLogs();
+        const newlyPaidOrders = (state.orders||[]).filter(o=>Number(o.paid)===1&&!prevPaid.has(o.id));
+        notifyPaidOrders(newlyPaidOrders);
+        enqueueAutoPrint(newlyPaidOrders);
+      } catch {}
+    }, 4000);
+  }
+
+  // ── VIEWS ────────────────────────────────────────────────
+  function switchView(view, el) {
+    document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+    document.getElementById(`view-${view}`).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    if (el) el.classList.add('active');
+    const titles = {dashboard:'Dashboard',kitchen:'Kitchen',manual:'Manual Order',tracking:'Tracking',menu:'Menu',history:'History'};
+    document.getElementById('tb-title').textContent = titles[view]||view;
+  }
+
+  // ── HELPERS ──────────────────────────────────────────────
+  function getPaidOrders() { return (state.orders||[]).filter(o=>Number(o.paid)===1); }
+  function eta(o) {
+    if (o.status==='delivered') return 'Delivered';
+    const elapsed = Math.floor((Date.now()-o.createdAt)/60000);
+    return `ETA ${Math.max(0,Number(o.etaMinutes||15)-elapsed)}m`;
+  }
+  function orderDateKey(o) {
+    const d = new Date(o.createdAt||Date.now());
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function sourceLabel(o) {
+    const source = String(o?.source || 'direct').toLowerCase();
+    if (source === 'manual') return 'Manual';
+    return source === 'direct' ? 'Direct' : 'Partner';
+  }
+  function getSelectedDate(id) { const el=document.getElementById(id); return el?.value||null; }
+  function clearDate(id, fn) { const el=document.getElementById(id); if(el)el.value=''; fn(); }
+
+  function clearDashboardDateFilter() { clearDate('dashboard-date-filter', renderDashboard); }
+  function clearKitchenDateFilter() { clearDate('kitchen-date-filter', renderKitchen); }
+  function clearMenuOrdersDateFilter() { clearDate('menu-orders-date-filter', renderMenuOrders); }
+
+  function typeBadge(o) {
+    const t = o.orderType||'dine';
+    const labels = {dine:`Table ${o.tableNumber||'-'}`,takeaway:'Takeaway',preorder:'Pre-order',delivery:'🏍️ Delivery'};
+    const cls = {dine:'tag-dine',takeaway:'tag-takeaway',preorder:'tag-preorder',delivery:'tag-delivery'};
+    return `<span class="tag ${cls[t]||'tag-dine'}">${labels[t]||t}</span>`;
+  }
+
+  function nextStatus(st) {
+    if (st==='new') return 'preparing';
+    if (st==='preparing') return 'ready';
+    if (st==='ready') return 'delivered';
+    return 'delivered';
+  }
+
+  // ── RECEIPT ──────────────────────────────────────────────
+  function receiptMarkup(o) {
+    const created = new Date(o.createdAt||Date.now());
+    const paidAt = o.paidAt ? new Date(o.paidAt) : null;
+    const sub = orderSubtotal(o);
+    const parcelCharge = orderParcelCharge(o);
+    const gst = Number(o.gst||o.tax||0);
+    const cgst = Number(o.cgst||(gst/2));
+    const sgst = Number(o.sgst||(gst-cgst));
+    const total = Number(o.total||(sub+cgst+sgst));
+    const totalQty = (o.items||[]).reduce((s,i)=>s+Number(i.qty||0),0);
+    const restoName = esc(state.restaurant?.name||managementAuth?.restaurant?.name||'Restaurant');
+    const isDelivery = o.orderType==='delivery';
+    const paidBadge = o.paid ? `<span class="tag tag-paid">Paid</span>` : `<span class="tag tag-pending">Pending</span>`;
+    const src = sourceLabel(o);
+    const srcBadge = src === 'Direct'
+      ? `<span class="tag tag-direct">Direct</span>`
+      : src === 'Manual'
+        ? `<span class="tag tag-manual">Manual</span>`
+        : `<span class="tag tag-partner">Partner</span>`;
+    const delivSection = isDelivery ? `
+      <div class="delivery-block">
+        <div class="delivery-block-title">🏍️ Delivery</div>
+        <div class="receipt-meta-row"><span class="k">Name</span><span class="v">${esc(o.deliveryName||'-')}</span></div>
+        <div class="receipt-meta-row"><span class="k">Mobile</span><span class="v">${esc(o.deliveryMobile||'-')}</span></div>
+        <div class="receipt-meta-row"><span class="k">Location</span><span class="v"><a href="https://maps.google.com/?q=${o.deliveryLat||0},${o.deliveryLng||0}" target="_blank" style="color:var(--green);">📍 View Map</a></span></div>
+      </div>
+    ` : '';
+    return `
+      <div class="receipt">
+        <div class="receipt-header">
+          <div>
+            <div class="receipt-brand">${restoName}</div>
+            <div class="receipt-invoice">Tax Invoice</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">${paidBadge}${srcBadge}</div>
+        </div>
+        <div class="receipt-body">
+          <div class="receipt-meta">
+            <div class="receipt-meta-row"><span class="k">Order ID</span><span class="v">${esc(o.label||'-')}</span></div>
+            <div class="receipt-meta-row"><span class="k">Date</span><span class="v">${created.toLocaleDateString('en-GB')}</span></div>
+            <div class="receipt-meta-row"><span class="k">Time</span><span class="v">${created.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})}</span></div>
+            <div class="receipt-meta-row"><span class="k">${o.orderType==='dine'?'Table':'Type'}</span><span class="v">${o.orderType==='dine'?(o.tableNumber?`T${o.tableNumber}`:'-'):esc(o.orderType||'-')}</span></div>
+            <div class="receipt-meta-row"><span class="k">Customer</span><span class="v">${esc(o.customerName||'-')}</span></div>
+            <div class="receipt-meta-row"><span class="k">Mobile</span><span class="v">${esc(o.customerMobile||'-')}</span></div>
+            ${paidAt?`<div class="receipt-meta-row"><span class="k">Paid at</span><span class="v">${paidAt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})}</span></div>`:''}
+          </div>
+          ${delivSection}
+          <div class="r-grid-head"><span>Item</span><span>Qty</span><span>Rate</span><span>Amount</span></div>
+          ${(o.items||[]).map(i=>`<div class="r-grid-row"><span>${esc(i.name)}</span><span>${i.qty}</span><span>${money(i.price)}</span><span>${money(Number(i.price)*Number(i.qty))}</span></div>`).join('')}
+          <div class="receipt-divider"></div>
+          <div class="r-tot-line"><span>Total Qty</span><span class="v">${totalQty}</span></div>
+          <div class="r-tot-line"><span>Subtotal</span><span class="v">${money(sub)}</span></div>
+          <div class="r-tot-line"><span>CGST @2.5%</span><span class="v">${money(cgst)}</span></div>
+          <div class="r-tot-line"><span>SGST @2.5%</span><span class="v">${money(sgst)}</span></div>
+          ${parcelCharge ? `<div class="r-tot-line"><span>Parcel charges</span><span class="v">${money(parcelCharge)}</span></div>` : ''}
+          <div class="r-grand"><span>Grand Total</span><span class="v">${money(total)}</span></div>
+        </div>
+        <div class="receipt-foot">
+          <span>${o.paid?`Paid · ${esc((o.paymentMethod||'').toUpperCase())}`:'Payment pending'} · ${esc(o.status||'-')}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── DASHBOARD ─────────────────────────────────────────────
+  function renderDashboard() {
+    const selectedDate = getSelectedDate('dashboard-date-filter');
+    const paidOrders = getPaidOrders().filter(o => !selectedDate || orderDateKey(o)===selectedDate);
+    const active = paidOrders.filter(o=>o.status!=='delivered').length;
+    const delivered = paidOrders.filter(o=>o.status==='delivered').length;
+    const overdue = paidOrders.filter(o=>o.status!=='delivered'&&(Date.now()-Number(o.createdAt||0))>(Number(o.etaMinutes||0)*60000)).length;
+    const revenue = paidOrders.reduce((s,o)=>s+Number(o.total||0),0);
+    const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
+    setText('m-active', overdue);
+    setText('m-overdue', `${active} active`);
+    setText('m-tables', delivered);
+    setText('m-wait', active);
+    setText('m-revenue', money(revenue));
+    setText('k-badge', paidOrders.filter(o=>o.status==='new').length);
+
+    const recent = paidOrders.slice(0,5);
+    const recentEl = document.getElementById('recent');
+    if (recentEl) recentEl.innerHTML = recent.length ? recent.map(o=>`
+      <div class="order-card">
+        <div class="order-card-head">
+          <div class="order-id">${esc(o.label)}</div>
+          <div class="order-tags">${typeBadge(o)}${o.paid?'<span class="tag tag-paid">Paid</span>':'<span class="tag tag-pending">Pending</span>'}</div>
+        </div>
+        <div class="order-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join(' · ')}</div>
+        <div class="order-foot">
+          <div class="order-amount">${money(o.total)}</div>
+          <div class="order-eta">${eta(o)}</div>
+        </div>
+      </div>
+    `).join('') : '<div style="font-size:13px;color:var(--text3);">No orders yet.</div>';
+
+    // Table grid
+    const tableGrid = document.getElementById('tables');
+    if (tableGrid) tableGrid.innerHTML = (state.tables||[]).map(t=>`
+      <div class="table-cell ${t.status}" onclick="onTableClick(${t.tableNumber})">
+        <div class="tc-num">T${t.tableNumber}</div>
+        <div class="tc-st">${t.status}</div>
+      </div>
+    `).join('');
+    renderOrderingMenuPanel();
+
+    // Outlet status
+    const r = state.restaurant||{};
+    outletOpen = r.acceptingOrders !== false;
+    const sw = document.getElementById('outlet-open-switch');
+    const lbl = document.getElementById('outlet-open-label');
+    const note = document.getElementById('outlet-status-note');
+    const ri = document.getElementById('outlet-reopen-note');
+    if (sw) sw.classList.toggle('on', outletOpen);
+    if (lbl) lbl.textContent = outletOpen?'Open':'Closed';
+    if (note) note.textContent = outletOpen?'Currently accepting orders.':`Closed.${r.reopenNote?` Back by ${r.reopenNote}`:''}`;
+    renderOutletLiveControl();
+    if (ri) ri.value = r.reopenNote||'';
+    const imgPreview = document.getElementById('restaurant-image-preview');
+    if (imgPreview) {
+      if (r.imageUrl) imgPreview.innerHTML = `<img src="${r.imageUrl}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      else imgPreview.textContent = 'No image';
+    }
+    const nameInp = document.getElementById('restaurant-name-input');
+    if (nameInp) nameInp.value = r.name || '';
+    const addrInp = document.getElementById('restaurant-address-input');
+    if (addrInp) addrInp.value = r.address || '';
+    const latInp = document.getElementById('restaurant-lat-input');
+    const lngInp = document.getElementById('restaurant-lng-input');
+    if (latInp) latInp.value = r.lat == null ? '' : Number(r.lat).toFixed(6);
+    if (lngInp) lngInp.value = r.lng == null ? '' : Number(r.lng).toFixed(6);
+    if (window._picker && window._picker.marker) {
+      try {
+        const la = Number(r.lat); const ln = Number(r.lng);
+        if (Number.isFinite(la) && Number.isFinite(ln)) {
+          window._picker.marker.setLatLng([la, ln]); window._picker.map.setView([la, ln], 15);
+        }
+      } catch (e) {}
+    }
+
+    renderTableStatusSwitch();
+  }
+
+  async function toggleOutletStatus() {
+    try {
+      const reopenNote = document.getElementById('outlet-reopen-note')?.value.trim() || '';
+      await api('/api/management/outlet-status','POST',{acceptingOrders:!outletOpen,reopenNote});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function saveOutletStatusNote() {
+    try {
+      const reopenNote = document.getElementById('outlet-reopen-note').value.trim();
+      await api('/api/management/outlet-status','POST',{acceptingOrders:outletOpen,reopenNote});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  function renderOutletLiveControl() {
+    const btn = document.getElementById('outlet-live-btn');
+    if (!btn) return;
+    btn.textContent = `Live: ${outletOpen ? 'On' : 'Off'}`;
+    btn.classList.toggle('active', outletOpen);
+  }
+
+  async function onRestaurantImageSelected(e) {
+    try {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const preview = document.getElementById('restaurant-image-preview');
+      preview.textContent = 'Uploading…';
+      const res = await apiUploadImage('/api/management/restaurant/image', file);
+      if (res && res.imageUrl) {
+        preview.innerHTML = `<img src="${res.imageUrl}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+        await fetchState();
+        loadManagementUsers();
+      }
+    } catch (err) { alert(err.message); }
+  }
+
+  async function saveRestaurantDetails() {
+    try {
+      const name = document.getElementById('restaurant-name-input').value.trim();
+      const address = document.getElementById('restaurant-address-input').value.trim();
+      const latVal = document.getElementById('restaurant-lat-input').value.trim();
+      const lngVal = document.getElementById('restaurant-lng-input').value.trim();
+      const lat = latVal === '' ? null : Number(latVal);
+      const lng = lngVal === '' ? null : Number(lngVal);
+      if (!name && !address) return alert('Enter name or address to save');
+      await api('/api/management/restaurant','PATCH',{ name, address, lat, lng });
+      await fetchState();
+      alert('Saved');
+      loadManagementUsers();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function loadManagementUsers() {
+    try {
+      const res = await api('/api/management/users');
+      const listEl = document.getElementById('management-users-list');
+      const users = res.users || [];
+      if (!users.length) { listEl.innerHTML = '<div style="color:var(--text3)">No users</div>'; return; }
+      listEl.innerHTML = users.map(u => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.02);">
+          <div style="font-weight:600">${esc(u.username)} <span style="font-weight:400;color:var(--text3);">· ${esc(u.role)}</span></div>
+          ${managementAuth?.role === 'owner' ? `<div style="display:flex;gap:6px;align-items:center;"><button class="btn-ghost" onclick="promptEditUser(${u.id},'${esc(u.username)}','${u.role}')">Edit</button><button class="btn-ghost" onclick="deleteManagementUser(${u.id})">Delete</button></div>` : ''}
+        </div>
+      `).join('');
+    } catch (err) { console.error(err); }
+  }
+
+  function promptEditUser(id, username, role) {
+    if (!confirm(`Edit user ${username}?`)) return;
+    if (managementAuth?.username && managementAuth.username === username && managementAuth.role === 'owner') {
+      // prevent accidentally demoting yourself
+      const check = confirm('You are editing your own owner account. Are you sure?');
+      if (!check) return;
+    }
+    const newPass = prompt('Enter new password (leave blank to keep):', '');
+    const newRole = prompt('Role (owner|staff):', role || 'staff');
+    const payload = {};
+    if (newPass) payload.password = newPass;
+    if (newRole) payload.role = String(newRole || 'staff').trim() === 'owner' ? 'owner' : 'staff';
+    if (!Object.keys(payload).length) return alert('Nothing to update');
+    // prevent self demotion
+    if (managementAuth?.username && managementAuth.username === username && managementAuth.role === 'owner' && payload.role && payload.role !== 'owner') {
+      return alert('You cannot demote your own owner account. Ask another owner to change your role.');
+    }
+    api(`/api/management/users/${id}`,'PATCH',payload).then(() => { alert('User updated'); loadManagementUsers(); }).catch(e => alert(e.message));
+  }
+
+  async function createManagementUser() {
+    try {
+      if (managementAuth?.role !== 'owner') return alert('Owner only');
+      const username = document.getElementById('new-user-username').value.trim();
+      const password = document.getElementById('new-user-password').value.trim();
+      const role = document.getElementById('new-user-role').value;
+      if (!username || password.length < 6) return alert('Username and password (>=6) required');
+      await api('/api/management/users','POST',{ username, password, role });
+      document.getElementById('new-user-username').value = '';
+      document.getElementById('new-user-password').value = '';
+      loadManagementUsers();
+      alert('User added');
+    } catch (err) { alert(err.message); }
+  }
+
+  function initMapPicker() {
+    try {
+      if (window._mapInitialized) return;
+      window._mapInitialized = true;
+      const L = window.L;
+      if (!L) return;
+      const map = L.map('map-picker', { attributionControl: false }).setView([17.449,78.391], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+      const latInp = document.getElementById('restaurant-lat-input');
+      const lngInp = document.getElementById('restaurant-lng-input');
+      const lat = Number(latInp.value) || 0;
+      const lng = Number(lngInp.value) || 0;
+      const marker = L.marker((lat && lng) ? [lat, lng] : map.getCenter(), { draggable: true }).addTo(map);
+      if (lat && lng) map.setView([lat, lng], 15);
+      marker.on('dragend', () => {
+        const p = marker.getLatLng(); latInp.value = p.lat.toFixed(6); lngInp.value = p.lng.toFixed(6);
+      });
+      map.on('click', (ev) => { marker.setLatLng(ev.latlng); latInp.value = ev.latlng.lat.toFixed(6); lngInp.value = ev.latlng.lng.toFixed(6); });
+      window._picker = { map, marker };
+    } catch (e) { console.warn('Map init failed', e); }
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) return alert('Geolocation not available');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+      document.getElementById('restaurant-lat-input').value = lat.toFixed(6);
+      document.getElementById('restaurant-lng-input').value = lng.toFixed(6);
+      if (window._picker && window._picker.marker) {
+        window._picker.marker.setLatLng([lat, lng]); window._picker.map.setView([lat, lng], 15);
+      }
+    }, (err) => alert('Location error: ' + err.message));
+  }
+
+  function getManualDraftLines() {
+    const menuById = new Map((state.menu || []).map(item => [Number(item.id), item]));
+    return Object.entries(manualOrderDraft)
+      .map(([id, qty]) => ({ item: menuById.get(Number(id)), qty: Number(qty || 0) }))
+      .filter(line => line.item && line.qty > 0);
+  }
+
+  function updateManualQty(id, delta) {
+    const item = (state.menu || []).find(entry => Number(entry.id) === Number(id));
+    if (!item || Number(item.available) !== 1) return;
+    const next = Math.max(0, Number(manualOrderDraft[id] || 0) + Number(delta || 0));
+    if (next) manualOrderDraft[id] = next;
+    else delete manualOrderDraft[id];
+    renderManualOrder();
+  }
+
+  function clearManualOrder() {
+    manualOrderDraft = {};
+    ['manual-customer-name', 'manual-customer-mobile', 'manual-table-number', 'manual-notes'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    renderManualOrder();
+  }
+
+  function selectManualCategory(category) {
+    manualSelectedCategory = String(category || 'all');
+    renderManualOrder();
+  }
+
+  function renderManualOrder() {
+    const list = document.getElementById('manual-menu-list');
+    const preview = document.getElementById('manual-order-preview');
+    if (!list || !preview) return;
+    const catButtons = document.getElementById('manual-category-buttons');
+    const query = String(document.getElementById('manual-menu-search')?.value || '').trim().toLowerCase();
+    const shortCode = String(document.getElementById('manual-short-code')?.value || '').trim().toLowerCase();
+    const allAvailable = (state.menu || [])
+      .filter(item => Number(item.available) === 1)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' }));
+    const categoryCounts = allAvailable.reduce((acc, item) => {
+      const cat = item.cat || item.category || 'other';
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {});
+    const allCats = Object.keys(categoryCounts).sort((a, b) => String(a).localeCompare(String(b), 'en', { sensitivity: 'base' }));
+    if (manualSelectedCategory !== 'all' && !categoryCounts[manualSelectedCategory]) manualSelectedCategory = 'all';
+    if (catButtons) {
+      catButtons.innerHTML = allCats.length ? `
+        <div class="manual-cat-grid">
+          <button class="manual-cat-btn ${manualSelectedCategory === 'all' ? 'active' : ''}" onclick="selectManualCategory('all')">
+            <span class="manual-cat-name">All Items</span>
+            <span class="manual-cat-count">${allAvailable.length} items</span>
+          </button>
+          ${allCats.map(cat => `
+            <button class="manual-cat-btn ${manualSelectedCategory === cat ? 'active' : ''}" onclick="selectManualCategory(${escAttr(JSON.stringify(cat))})">
+              <span class="manual-cat-name">${esc(cat)}</span>
+              <span class="manual-cat-count">${categoryCounts[cat]} items</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : '';
+    }
+    const available = allAvailable
+      .filter(item => manualSelectedCategory === 'all' || (item.cat || item.category || 'other') === manualSelectedCategory)
+      .filter(item => !query || String(item.name || '').toLowerCase().includes(query) || String(item.cat || item.category || '').toLowerCase().includes(query))
+      .filter(item => {
+        if (!shortCode) return true;
+        const id = String(item.id || '').toLowerCase();
+        const name = String(item.name || '').toLowerCase();
+        const compact = name.replace(/\s+/g, '');
+        const initials = name.split(/\s+/).map(part => part[0] || '').join('');
+        return id.includes(shortCode) || compact.includes(shortCode) || initials.includes(shortCode);
+      });
+    const byCat = available.reduce((acc, item) => {
+      const cat = item.cat || item.category || 'other';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    }, {});
+    const cats = Object.keys(byCat).sort((a, b) => String(a).localeCompare(String(b), 'en', { sensitivity: 'base' }));
+    list.innerHTML = cats.length ? cats.map(cat => `
+      <div class="manual-item-section">
+        <div class="manual-section-title">${esc(cat)}</div>
+        <div class="manual-item-grid">
+          ${byCat[cat].map(item => {
+            const qty = Number(manualOrderDraft[item.id] || 0);
+            return `
+          <div class="manual-item-card ${qty ? 'selected' : ''}" onclick="updateManualQty(${item.id},1)">
+            <div class="manual-item-name">${esc(item.name)}</div>
+            <div class="manual-item-foot">
+              <div class="manual-item-price">${money(item.price)}</div>
+              <div class="op-qty" onclick="event.stopPropagation()">
+                <button class="op-qty-btn" onclick="updateManualQty(${item.id},-1)">-</button>
+                <div class="op-qty-val">${qty}</div>
+                <button class="op-qty-btn" onclick="updateManualQty(${item.id},1)">+</button>
+              </div>
+            </div>
+          </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `).join('') : `<div style="padding:16px;font-size:12px;color:var(--text3);">${query || shortCode ? 'No matching menu items.' : 'No available menu items.'}</div>`;
+
+    const lines = getManualDraftLines();
+    const orderType = document.getElementById('manual-order-type')?.value || 'takeaway';
+    const itemsTotal = lines.reduce((sum, line) => sum + Number(line.item.price || 0) * line.qty, 0);
+    const parcelCharge = lines.length && orderType === 'takeaway' ? PARCEL_CHARGE_AMOUNT : 0;
+    const inclusiveTotal = itemsTotal + parcelCharge;
+    const subtotal = Number((inclusiveTotal / 1.05).toFixed(2));
+    const gst = Number((inclusiveTotal - subtotal).toFixed(2));
+    const cgst = Number((gst / 2).toFixed(2));
+    const sgst = Number((gst - cgst).toFixed(2));
+    const totalQty = lines.reduce((sum, line) => sum + line.qty, 0);
+    preview.innerHTML = `
+      <div style="padding:14px 16px;">
+        ${lines.length ? lines.map(line => `
+          <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <div>
+              <div style="font-weight:700;">${esc(line.item.name)}</div>
+              <div style="font-size:11px;color:var(--text3);">${line.qty} x ${money(line.item.price)}</div>
+            </div>
+            <div style="font-weight:800;">${money(Number(line.item.price || 0) * line.qty)}</div>
+          </div>
+        `).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0;">Add items to generate a bill.</div>'}
+        <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:grid;gap:7px;">
+          <div style="display:flex;justify-content:space-between;color:var(--text2);font-size:12px;"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;color:var(--text2);font-size:12px;"><span>CGST @2.5%</span><span>${money(cgst)}</span></div>
+          <div style="display:flex;justify-content:space-between;color:var(--text2);font-size:12px;"><span>SGST @2.5%</span><span>${money(sgst)}</span></div>
+          ${parcelCharge ? `<div style="display:flex;justify-content:space-between;color:var(--text);font-size:12px;font-weight:800;"><span>Parcel charges</span><span>${money(parcelCharge)}</span></div>` : ''}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+          <div style="font-size:12px;color:var(--text3);">${totalQty} items</div>
+          <div style="font-size:20px;font-weight:900;color:var(--text);">${money(inclusiveTotal)}</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn-ghost" style="flex:1;" onclick="clearManualOrder()">Clear</button>
+          <button class="btn-primary" style="flex:2;" ${lines.length ? '' : 'disabled'} onclick="submitManualOrder()">Create & Print Bill</button>
+        </div>
+      </div>
+    `;
+  }
+
+  async function submitManualOrder() {
+    const lines = getManualDraftLines();
+    if (!lines.length) { alert('Add at least one item.'); return; }
+    const orderType = document.getElementById('manual-order-type')?.value || 'takeaway';
+    const tableNumber = Number(document.getElementById('manual-table-number')?.value || 0) || null;
+    if (orderType === 'dine' && !tableNumber) {
+      if (!confirm('Create dine-in bill without a table number?')) return;
+    }
+    const paymentMethod = document.getElementById('manual-payment-method')?.value || 'cash';
+    const payload = {
+      orderType,
+      tableNumber: orderType === 'dine' ? tableNumber : null,
+      notes: document.getElementById('manual-notes')?.value.trim() || 'Manual counter order',
+      customerName: document.getElementById('manual-customer-name')?.value.trim() || null,
+      customerMobile: document.getElementById('manual-customer-mobile')?.value.trim() || null,
+      items: lines.map(line => ({ menuItemId: Number(line.item.id), qty: line.qty })),
+      paid: true,
+      paymentMethod
+    };
+    try {
+      const data = await api('/api/orders', 'POST', payload);
+      const order = data.order;
+      manualOrderDraft = {};
+      await fetchState();
+      showToast('Manual bill created');
+      printOrder(order, { silentPopupError: false });
+      printCounterKot(order, { silentPopupError: false, printDelay: 1200 });
+    } catch (error) {
+      alert(error.message || 'Failed to create manual order');
+    }
+  }
+
+  async function deleteManagementUser(id) {
+    if (!confirm('Delete this user?')) return;
+    try { await api(`/api/management/users/${id}`,'DELETE'); loadManagementUsers(); } catch (err) { alert(err.message); }
+  }
+
+  // ── TABLE ─────────────────────────────────────────────────
+  function renderTableStatusSwitch() {
+    const el = document.getElementById('dashboard-table-status-list');
+    if (!el) return;
+    const tables = (state.tables||[]).slice().sort((a,b)=>a.tableNumber-b.tableNumber);
+    if (!tables.length) { el.innerHTML='<div style="font-size:12px;color:var(--text3);">No tables found.</div>'; return; }
+    el.innerHTML = tables.map(t=>`
+      <div class="tsl-item">
+        <div><div class="tsl-name">Table ${t.tableNumber}</div><div class="tsl-status">${t.status}</div></div>
+        <div class="tsl-actions">
+          <button class="tsl-btn free ${t.status==='free'?'active':''}" onclick="setTableStatus(${t.tableNumber},'free')">Free</button>
+          <button class="tsl-btn ordering ${t.status==='ordering'?'active':''}" onclick="setTableStatus(${t.tableNumber},'ordering')">Ordering</button>
+          <button class="tsl-btn occupied ${t.status==='occupied'?'active':''}" onclick="setTableStatus(${t.tableNumber},'occupied')">Occupied</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderOrderingMenuPanel() {
+    const panel = document.getElementById('ordering-menu-panel');
+    if (!panel) return;
+    const activeTables = (state.tables||[]).filter(t=>t.status==='ordering'||t.status==='occupied').map(t=>t.tableNumber);
+    if (!activeTables.length) {
+      selectedOrderingTableNumber = null;
+      panel.innerHTML = '<div class="ordering-panel"><div class="op-title">No active tables</div></div>';
+      return;
+    }
+    if (!selectedOrderingTableNumber || !activeTables.includes(selectedOrderingTableNumber)) {
+      selectedOrderingTableNumber = activeTables[0];
+    }
+    if (!tableOrderDrafts[selectedOrderingTableNumber]) tableOrderDrafts[selectedOrderingTableNumber]={};
+    const draft = tableOrderDrafts[selectedOrderingTableNumber];
+    const avail = (state.menu||[]).filter(m=>Number(m.available)===1);
+    const byCat = avail.reduce((acc,m)=>{ const k=m.cat||'other'; if(!acc[k])acc[k]=[]; acc[k].push(m); return acc; },{});
+    const cats = Object.keys(byCat);
+    const count = Object.values(draft).reduce((s,q)=>s+Number(q||0),0);
+    panel.innerHTML = `
+      <div class="ordering-panel">
+        <div class="op-title">T${selectedOrderingTableNumber} Order</div>
+        ${cats.map(cat=>`
+          <div class="op-cat">
+            <div class="op-cat-name">${esc(cat)}</div>
+            ${byCat[cat].map(item=>`
+              <div class="op-item">
+                <div class="op-item-name">${esc(item.name)}</div>
+                <div class="op-qty">
+                  <button class="op-qty-btn" onclick="updateDraftQty(${item.id},-1)">−</button>
+                  <div class="op-qty-val">${draft[item.id]||0}</div>
+                  <button class="op-qty-btn" onclick="updateDraftQty(${item.id},1)">+</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+        <div class="op-footer">
+          <div class="op-count">${count} items</div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-ghost" style="font-size:11px;" ${count?'':'disabled'} onclick="cancelOrderingTableOrder()">Cancel</button>
+            <button class="btn-primary" style="font-size:11px;" onclick="submitOrderingTableOrder()">Submit</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function onTableClick(tableNumber) {
+    const t = (state.tables||[]).find(t=>t.tableNumber===tableNumber);
+    if (!t) return;
+    if (t.status==='ordering'||t.status==='occupied') {
+      selectedOrderingTableNumber = tableNumber; renderOrderingMenuPanel(); return;
+    }
+    await toggleTable(tableNumber);
+  }
+
+  function cancelOrderingTableOrder() {
+    if (selectedOrderingTableNumber) setTableStatusFree(selectedOrderingTableNumber);
+  }
+  async function setTableStatusFree(n) { await setTableStatus(n,'free'); }
+  async function setTableStatus(n, s) {
+    try {
+      if(s==='free') tableOrderDrafts[n]={};
+      await api(`/api/tables/${n}/status`,'POST',{status:s});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+  function updateDraftQty(id, delta) {
+    if (!selectedOrderingTableNumber) return;
+    if (!tableOrderDrafts[selectedOrderingTableNumber]) tableOrderDrafts[selectedOrderingTableNumber]={};
+    const cur = Number(tableOrderDrafts[selectedOrderingTableNumber][id]||0);
+    tableOrderDrafts[selectedOrderingTableNumber][id] = Math.max(0,cur+delta);
+    renderOrderingMenuPanel();
+  }
+  async function submitOrderingTableOrder() {
+    if (!selectedOrderingTableNumber) { alert('Select an active table first.'); return; }
+    const t = (state.tables||[]).find(t=>t.tableNumber===selectedOrderingTableNumber);
+    if (!t||(t.status!=='ordering'&&t.status!=='occupied')) { alert('Table not in ordering/occupied state.'); return; }
+    const draft = tableOrderDrafts[selectedOrderingTableNumber]||{};
+    const items = Object.entries(draft).filter(([,q])=>Number(q)>0).map(([id,q])=>({menuItemId:Number(id),qty:Number(q)}));
+    if (!items.length) { alert('Add at least one item before submitting.'); return; }
+    try {
+      await api('/api/orders','POST',{orderType:'dine',tableNumber:selectedOrderingTableNumber,notes:'Management panel order',items});
+      tableOrderDrafts[selectedOrderingTableNumber]={};
+      showToast('Order submitted');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function addTable() {
+    try {
+      await api('/api/tables','POST',{});
+      showToast('Table added');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+  async function toggleTable(n) {
+    try {
+      await api(`/api/tables/${n}/toggle`,'POST',{});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  function openRemoveModal(n) {
+    pendingRemoveTableNumber = n;
+    document.getElementById('remove-modal-text').textContent = `Remove Table T${n}? Only free tables can be removed.`;
+    document.getElementById('remove-modal').classList.add('open');
+  }
+  function closeRemoveModal() { pendingRemoveTableNumber=null; document.getElementById('remove-modal').classList.remove('open'); }
+  async function confirmRemoveTable() {
+    if (!pendingRemoveTableNumber) return;
+    try {
+      await api(`/api/tables/${pendingRemoveTableNumber}`,'DELETE');
+      const input = document.getElementById('remove-table-number');
+      if (input) input.value='';
+      closeRemoveModal();
+      showToast('Table removed');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+  async function removeTable() {
+    const input = document.getElementById('remove-table-number');
+    let n = Number(input?.value||0);
+    if (!n) {
+      const free = (state.tables||[]).filter(t=>t.status==='free').map(t=>t.tableNumber);
+      if (!free.length) { alert('No free table available. Enter a table number manually.'); return; }
+      n = Math.max(...free);
+    }
+    openRemoveModal(n);
+  }
+
+  // ── KITCHEN ──────────────────────────────────────────────
+  function renderKitchen() {
+    const selectedDate = getSelectedDate('kitchen-date-filter');
+    const deliveryOnlyCheckbox = document.getElementById('kitchen-delivery-only');
+    const deliveryOnly = deliveryOnlyCheckbox ? deliveryOnlyCheckbox.checked : false;
+
+    const paidOrders = getPaidOrders().filter(o => {
+      if (deliveryOnly && o.orderType !== 'delivery') return false;
+      if (!selectedDate) return true;
+      return orderDateKey(o) === selectedDate;
+    });
+    const groups = { new:[], preparing:[], ready:[], delivered:[] };
+    paidOrders.forEach(o => (groups[o.status]||groups.new).push(o));
+    ['new','preparing','ready','delivered'].forEach(st=>{
+      document.getElementById(`c-${st}`).textContent = groups[st].length;
+      const el = document.getElementById(`l-${st}`);
+      if (!groups[st].length) { el.innerHTML=`<div class="no-orders-msg">No orders</div>`; return; }
+      el.innerHTML = groups[st].map(o=>`
+        <div class="kitchen-card" style="${st==='delivered'?'opacity:0.55':''}">
+          <div class="kc-head">
+            <div class="kc-id">${esc(o.label)}</div>
+            <div style="display:flex;gap:4px;">${typeBadge(o)}</div>
+          </div>
+          <div class="kc-customer">👤 ${esc(o.customerName||o.deliveryName||'-')} · ${esc(o.customerMobile||o.deliveryMobile||'-')}</div>
+          <div class="kc-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join(' · ')}</div>
+          <div class="kc-eta">${eta(o)}</div>
+          ${st!=='delivered'?`<button class="kc-btn" onclick="changeStatus(${o.id},'${nextStatus(st)}')">→ ${nextStatus(st).charAt(0).toUpperCase()+nextStatus(st).slice(1)}</button>`:''}
+        </div>
+      `).join('');
+    });
+  }
+
+  function addKitchenPrintButtons() {
+    const selectedDate = getSelectedDate('kitchen-date-filter');
+    const deliveryOnlyCheckbox = document.getElementById('kitchen-delivery-only');
+    const deliveryOnly = deliveryOnlyCheckbox ? deliveryOnlyCheckbox.checked : false;
+    const groups = { new: [], preparing: [], ready: [], delivered: [] };
+    getPaidOrders().forEach((order) => {
+      if (deliveryOnly && order.orderType !== 'delivery') return;
+      if (selectedDate && orderDateKey(order) !== selectedDate) return;
+      (groups[order.status] || groups.new).push(order);
+    });
+    ['new', 'preparing', 'ready', 'delivered'].forEach((status) => {
+      const list = document.getElementById(`l-${status}`);
+      if (!list) return;
+      const cards = Array.from(list.querySelectorAll('.kitchen-card'));
+      cards.forEach((card, index) => {
+        const order = groups[status][index];
+        if (!order || card.querySelector('.print-bill-btn')) return;
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '8px';
+        row.style.marginTop = '8px';
+        const existing = card.querySelector('.kc-btn');
+        if (existing) {
+          existing.style.marginTop = '0';
+          existing.style.flex = '1';
+          row.appendChild(existing);
+        }
+        const button = document.createElement('button');
+        button.className = 'kc-btn print-bill-btn';
+        button.style.marginTop = '0';
+        button.style.flex = '1';
+        button.style.background = 'var(--green-l)';
+        button.style.color = 'var(--green)';
+        button.style.borderColor = 'rgba(34,197,94,0.28)';
+        button.textContent = 'Print Bill';
+        button.onclick = () => printKitchenOrder(order.id);
+        row.appendChild(button);
+        card.appendChild(row);
+      });
+    });
+  }
+
+  function printKitchenOrder(id) {
+    const order = (state.orders||[]).find(o=>Number(o.id)===Number(id));
+    if (!order) { alert('Order not found.'); return; }
+    printOrder(order, { silentPopupError: false });
+  }
+
+  async function changeStatus(id, status) {
+    try {
+      await api(`/api/orders/${id}/status`,'POST',{status});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  // ── TRACKING ─────────────────────────────────────────────
+  function renderTracking() {
+    const slider = document.getElementById('tslider');
+    if (!slider) return;
+    const orders = getPaidOrders().slice().sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    if (!orders.length) { slider.innerHTML='<div class="no-orders-msg">No orders to track.</div>'; return; }
+    slider.innerHTML = orders.map(o=>`
+      <div class="track-card">
+        ${receiptMarkup(o)}
+        <div class="progress-bar"><div class="progress-fill" style="width:${o.progress||0}%"></div></div>
+        <div class="progress-info">${o.progress||0}% · ${esc(o.status)} · ${eta(o)}</div>
+      </div>
+    `).join('');
+  }
+
+  function scrollTracking(dir) {
+    const slider = document.getElementById('tslider');
+    if (!slider) return;
+    slider.scrollBy({left:dir*340,behavior:'smooth'});
+  }
+
+  // ── MENU ─────────────────────────────────────────────────
+  function renderMenuManagement() {
+    const el = document.getElementById('menu-admin-list');
+    if (!el) return;
+    if (csvPreviewItems) {
+      el.innerHTML = `
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:center;">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:var(--text1);">CSV Preview</div>
+            <div style="font-size:11px;color:var(--text3);">${csvPreviewItems.length} items ready to import${csvPreviewErrors.length ? ` · ${csvPreviewErrors.length} skipped` : ''}</div>
+          </div>
+          <button class="btn-primary" onclick="importMenuCsv()">Import CSV</button>
+        </div>
+        ${csvPreviewItems.length ? csvPreviewItems.map((item, index)=>`
+          <div class="menu-item-row">
+            <div class="menu-thumb-empty">${esc(item.emoji||'🍽️')}</div>
+            <div class="menu-info">
+              <div class="menu-name">#${index + 1} · ${esc(item.name)}</div>
+              <div class="menu-meta">${esc(item.category||'general')} · ${money(item.price)}</div>
+            </div>
+            <div class="menu-actions">
+              <span style="font-size:11px;color:var(--text3);">Import to upload photo</span>
+            </div>
+          </div>
+        `).join('') : '<div style="padding:16px;font-size:12px;color:var(--text3);">No valid CSV rows found.</div>'}
+      `;
+      return;
+    }
+    const searchInput = document.getElementById('menu-item-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    let rows = (state.menu||[]).slice().sort((a,b)=>Number(a.id)-Number(b.id));
+    if (query) {
+      rows = rows.filter(item => {
+        const name = String(item.name || '').toLowerCase();
+        const category = String(item.cat || item.category || '').toLowerCase();
+        const description = String(item.desc || item.description || '').toLowerCase();
+        const id = String(item.id);
+        return name.includes(query) || category.includes(query) || description.includes(query) || id.includes(query);
+      });
+    }
+
+    if (!rows.length) { 
+      el.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--text3);">${query ? 'No matching menu items found.' : 'No menu items.'}</div>`; 
+      return; 
+    }
+    el.innerHTML = rows.map(item=>{
+      const avail = Number(item.available)===1;
+      return `
+        <div class="menu-item-row">
+          ${item.imageUrl?`<img id="menu-thumb-${item.id}" class="menu-thumb" src="${esc(item.imageUrl)}" alt="${esc(item.name)}" />`:`<div id="menu-thumb-${item.id}" class="menu-thumb-empty">${esc(item.emoji||'🍽️')}</div>`}
+          <div class="menu-info">
+            <div class="menu-name">#${item.id} · ${esc(item.name)}</div>
+            <div class="menu-meta">${esc(item.cat)} · ${money(item.price)}</div>
+          </div>
+          <div class="menu-actions">
+            <input id="menu-image-${item.id}" type="file" accept="image/*" onchange="previewMenuImage(${item.id})" class="inp" style="width:140px;font-size:10px;padding:5px;" />
+            <button class="state-btn" onclick="editMenuItem(${item.id})">Edit</button>
+            <button class="state-btn" onclick="uploadMenuImage(${item.id})">Upload</button>
+            <button class="state-btn" onclick="setMenuImageUrl(${item.id})">Image URL</button>
+            <button class="state-btn avail ${avail?'active':''}" onclick="setMenuAvailability(${item.id},true)">Available</button>
+            <button class="state-btn unavail ${!avail?'active':''}" onclick="setMenuAvailability(${item.id},false)">Unavailable</button>
+            <button class="btn-danger" onclick="deleteMenuItem(${item.id})">✕</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderMenuOrders() {
+    const el = document.getElementById('menu-order-list');
+    if (!el) return;
+    const selectedDate = getSelectedDate('menu-orders-date-filter');
+    const orders = getPaidOrders().filter(o=>!selectedDate||orderDateKey(o)===selectedDate).sort((a,b)=>Number(b.createdAt)-Number(a.createdAt));
+    if (!orders.length) { el.innerHTML='<div style="padding:14px;font-size:12px;color:var(--text3);">No orders found.</div>'; return; }
+    let lastDate='';
+    el.innerHTML = orders.map(o=>{
+      const d = new Date(o.createdAt||Date.now());
+      const dk = d.toLocaleDateString('en-GB');
+      const dHeader = dk!==lastDate ? `<div style="padding:8px 16px;background:var(--bg3);font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);">${dk}</div>` : '';
+      lastDate=dk;
+      return `
+        ${dHeader}
+        <div class="order-list-item">
+          <div class="oli-head">
+            <div class="oli-id">${esc(o.label)}</div>
+            <div class="oli-time">${d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})}</div>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:6px;">${typeBadge(o)}</div>
+          <div class="oli-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join(' · ')}</div>
+          <div class="oli-foot">
+            <div class="oli-total">${money(o.total)}</div>
+            <div>${o.paid?'<span class="tag tag-paid">Paid</span>':'<span class="tag tag-pending">Unpaid</span>'}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function setMenuAvailability(id, available) {
+    try {
+      await api(`/api/menu/${id}/availability`,'POST',{available});
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function deleteMenuItem(id) {
+    const item = (state.menu||[]).find(m=>Number(m.id)===Number(id));
+    if (!confirm(`Delete ${item?.name || `item #${id}`}?`)) return;
+    try {
+      await api(`/api/menu/${id}`,'DELETE');
+      showToast('Menu item deleted');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function addMenuItem() {
+    const name = document.getElementById('menu-name').value.trim();
+    const price = Number(document.getElementById('menu-price').value||0);
+    const cat = document.getElementById('menu-cat').value.trim();
+    const emoji = document.getElementById('menu-emoji').value.trim();
+    const desc = document.getElementById('menu-desc').value.trim();
+    const imgInput = document.getElementById('menu-image-file');
+    const imgFile = imgInput?.files?.[0]||null;
+    try {
+      const created = await api('/api/menu','POST',{name,price,cat,emoji,desc,available:true});
+      if (imgFile&&created?.id) await apiUploadImage(`/api/menu/${created.id}/image`,imgFile);
+      ['menu-name','menu-price','menu-cat','menu-emoji','menu-desc'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
+      if (imgInput) imgInput.value='';
+      showToast('Menu item saved');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function uploadMenuImage(id) {
+    const input = document.getElementById(`menu-image-${id}`);
+    const file = input?.files?.[0];
+    if (!file) { alert('Choose an image file first.'); return; }
+    try { await apiUploadImage(`/api/menu/${id}/image`,file); input.value=''; await fetchState(); } catch(e) { alert(e.message); }
+  }
+
+  async function setMenuImageUrl(id) {
+    const current = (state.menu||[]).find(item=>Number(item.id)===Number(id))?.imageUrl || '';
+    const imageUrl = prompt('Paste online image URL', current);
+    if (imageUrl === null) return;
+
+    const trimmed = imageUrl.trim();
+    if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+      alert('Image URL must start with http:// or https://');
+      return;
+    }
+
+    try {
+      await api(`/api/menu/${id}/image-url`,'POST',{imageUrl:trimmed});
+      showToast(trimmed ? 'Image URL saved' : 'Image removed');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function editMenuItem(id) {
+    const item = (state.menu||[]).find(m=>Number(m.id)===Number(id));
+    if (!item) { alert('Menu item not found. Refresh and try again.'); return; }
+
+    const name = prompt('Food name', item.name || '');
+    if (name === null) return;
+    const priceText = prompt('Price', item.price || '');
+    if (priceText === null) return;
+    const cat = prompt('Category', item.cat || 'general');
+    if (cat === null) return;
+    const desc = prompt('Description', item.desc || item.description || '');
+    if (desc === null) return;
+    const emoji = prompt('Emoji', item.emoji || '🍽️');
+    if (emoji === null) return;
+
+    const price = Number(String(priceText).replace(/[^\d.]/g,''));
+    if (!name.trim()) { alert('Food name is required.'); return; }
+    if (!Number.isFinite(price) || price <= 0) { alert('Enter a valid price.'); return; }
+    if (!cat.trim()) { alert('Category is required.'); return; }
+
+    try {
+      await api(`/api/menu/${id}`,'PATCH',{
+        name:name.trim(),
+        price,
+        cat:cat.trim(),
+        desc:desc.trim(),
+        emoji:emoji.trim()
+      });
+      showToast('Menu item updated');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  async function deleteMenuItemByInput() {
+    const input = document.getElementById('menu-delete-id');
+    const id = Number(input?.value || prompt('Delete item ID') || 0);
+    if (!id) { alert('Enter a valid item ID.'); return; }
+    await deleteMenuItem(id);
+    if (input) input.value='';
+  }
+
+  async function renameMenuItemByInput() {
+    const idInput = document.getElementById('menu-edit-id');
+    const nameInput = document.getElementById('menu-edit-name');
+    const id = Number(idInput?.value || prompt('Edit item ID') || 0);
+    const name = String(nameInput?.value || prompt('New food name') || '').trim();
+    if (!id) { alert('Enter a valid item ID.'); return; }
+    if (!name) { alert('Enter the new name.'); return; }
+    try {
+      await api(`/api/menu/${id}/name`,'PATCH',{name});
+      if (idInput) idInput.value='';
+      if (nameInput) nameInput.value='';
+      showToast('Menu item renamed');
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  function parseCsvLine(line) {
+    const values = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < String(line || '').length; i += 1) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (quoted && line[i + 1] === '"') {
+          cur += '"';
+          i += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (ch === ',' && !quoted) {
+        values.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    values.push(cur.trim());
+    return values;
+  }
+
+  function parseMenuCsvItems(csvText) {
+    const lines = String(csvText || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(r => r.trim());
+    if (!lines.length) return { items: [], errors: ['CSV is empty'] };
+
+    const header = parseCsvLine(lines[0]).map(v => v.toLowerCase());
+    const hasHeader = header.includes('item') || header.includes('name') || header.includes('price');
+    const itemIndex = hasHeader ? (header.indexOf('item') >= 0 ? header.indexOf('item') : header.indexOf('name')) : -1;
+    const priceIndex = hasHeader ? header.indexOf('price') : -1;
+    const categoryIndex = hasHeader ? header.indexOf('category') : -1;
+    const items = [];
+    const errors = [];
+
+    (hasHeader ? lines.slice(1) : lines).forEach((row, i) => {
+      const cols = parseCsvLine(row);
+      const lineNumber = i + (hasHeader ? 2 : 1);
+      const looksCategoryItemPrice = categoryIndex >= 0 || (!hasHeader && Number.isNaN(Number(String(cols[1] || '').replace(/[^\d.]/g, ''))) && !Number.isNaN(Number(String(cols[2] || '').replace(/[^\d.]/g, ''))));
+      const name = hasHeader
+        ? String(cols[itemIndex] || '').trim()
+        : String(cols[looksCategoryItemPrice ? 1 : 0] || '').trim();
+      const priceRaw = hasHeader
+        ? cols[priceIndex]
+        : cols[looksCategoryItemPrice ? 2 : 1];
+      const category = hasHeader
+        ? String(cols[categoryIndex] || 'general').trim()
+        : String(cols[looksCategoryItemPrice ? 0 : 2] || 'general').trim();
+      const price = Number(String(priceRaw || '').replace(/[^\d.]/g, ''));
+
+      if (!name || !priceRaw) {
+        errors.push(`Row ${lineNumber}: Missing`);
+        return;
+      }
+      if (!Number.isFinite(price) || price <= 0) {
+        errors.push(`Row ${lineNumber}: Invalid price`);
+        return;
+      }
+
+      items.push({ name, price, category: category || 'general' });
+    });
+
+    return { items, errors };
+  }
+
+  async function previewMenuCsv() {
+    const input = document.getElementById('menu-csv-file');
+    const file = input?.files?.[0];
+    if (!file) {
+      csvPreviewItems = null;
+      csvPreviewErrors = [];
+      renderMenuManagement();
+      return;
+    }
+
+    try {
+      const csvText = await file.text();
+      const parsed = parseMenuCsvItems(csvText);
+      csvPreviewItems = parsed.items;
+      csvPreviewErrors = parsed.errors;
+      renderMenuManagement();
+      showToast(`CSV loaded: ${parsed.items.length} items`);
+    } catch (e) {
+      csvPreviewItems = null;
+      csvPreviewErrors = [];
+      showToast(e.message || 'Could not read CSV', '#ef4444');
+      renderMenuManagement();
+    }
+  }
+
+  function previewMenuImage(id) {
+    const input = document.getElementById(`menu-image-${id}`);
+    const file = input?.files?.[0];
+    const thumb = document.getElementById(`menu-thumb-${id}`);
+    if (!file || !thumb) return;
+
+    const url = URL.createObjectURL(file);
+    if (thumb.tagName === 'IMG') {
+      thumb.src = url;
+      return;
+    }
+
+    const img = document.createElement('img');
+    img.id = `menu-thumb-${id}`;
+    img.className = 'menu-thumb';
+    img.alt = 'Selected menu image';
+    img.src = url;
+    thumb.replaceWith(img);
+  }
+
+  async function importMenuCsv() {
+    const input = document.getElementById('menu-csv-file');
+    const file = input?.files?.[0];
+    if (!file) { showToast('Select CSV first', '#ef4444'); return; }
+    try {
+      const csvText = await file.text();
+      const { items, errors } = parseMenuCsvItems(csvText);
+
+      if (errors.length) {
+        alert(errors.slice(0, 5).join('\n'));
+        return;
+      }
+      if (!items.length) {
+        showToast('No menu items found', '#ef4444');
+        return;
+      }
+
+      await api('/api/menu/bulk','POST',{items});
+      showToast(`Menu uploaded: ${items.length} items`);
+      csvPreviewItems = null;
+      csvPreviewErrors = [];
+      input.value='';
+      await fetchState();
+    } catch(e) { alert(e.message); }
+  }
+
+  // ── HISTORY ──────────────────────────────────────────────
+  function renderHistoryTable() {
+    const el = document.getElementById('history-order-list');
+    if (!el) return;
+    const selectedDate = document.getElementById('history-export-date')?.value || '';
+    const orders = (state.orders||[])
+      .filter(o => !selectedDate || orderDateKey(o) === selectedDate)
+      .slice()
+      .sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+    if (!orders.length) { el.innerHTML=`<div style="padding:16px;font-size:12px;color:var(--text3);">${selectedDate ? 'No orders found for selected date.' : 'No orders found.'}</div>`; return; }
+    el.innerHTML = `
+      <table class="history-table">
+        <thead><tr><th>Order No</th><th>Date</th><th>Customer</th><th>Mobile</th><th>Status</th><th class="r">Amount</th></tr></thead>
+        <tbody>${orders.map(o=>`
+          <tr>
+            <td class="mono">${esc(o.label||'-')}</td>
+            <td class="mono">${new Date(o.createdAt||Date.now()).toLocaleDateString('en-IN')}</td>
+            <td>${esc(o.customerName||o.deliveryName||'-')}</td>
+            <td class="mono">${esc(o.customerMobile||o.deliveryMobile||'-')}</td>
+            <td><span class="tag tag-${o.status||'new'}">${esc(o.status||'-')}</span></td>
+            <td class="amount r">${money(o.total||0)}</td>
+          </tr>
+        `).join('')}</tbody>
+      </table>
+    `;
+  }
+
+  function downloadHistoryByDateExcel() {
+    const dateText = document.getElementById('history-export-date').value;
+    if (!dateText) { alert('Select a date first.'); return; }
+    const rows = (state.orders||[]).filter(o=>orderDateKey(o)===dateText && String(o.status||'').toLowerCase()==='delivered');
+    if (!rows.length) { alert('No delivered orders for selected date.'); return; }
+    let total=0;
+    let totalGst=0;
+    const dataRows = rows.map(o=>{
+      const gst = Number(o.gst||o.tax||0);
+      const amount = Number(o.total||0);
+      const orderDate = new Date(o.createdAt||Date.now()).toLocaleString('en-IN');
+      totalGst += gst;
+      total += amount;
+      return `<tr><td>${esc(o.label||'-')}</td><td>${esc(orderDate)}</td><td>${esc(o.customerName||o.deliveryName||'-')}</td><td>${esc(o.customerMobile||o.deliveryMobile||'-')}</td><td>${gst.toFixed(2)}</td><td>${amount.toFixed(2)}</td></tr>`;
+    }).join('');
+    const summaryRows = `<tr><td colspan="6"></td></tr><tr><th colspan="5" style="text-align:right">Total GST for day</th><th>${totalGst.toFixed(2)}</th></tr><tr><th colspan="5" style="text-align:right">Total amount for day</th><th>${total.toFixed(2)}</th></tr>`;
+    const exportHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"/></head><body><table border="1"><tr><th colspan="6">Delivered Orders ${dateText} - Total: ${money(total)}</th></tr><tr><th>Order No</th><th>Date</th><th>Name</th><th>Mobile</th><th>GST</th><th>Amount</th></tr>${dataRows}${summaryRows}</table></body></html>`;
+    const blob = new Blob([exportHtml],{type:'application/vnd.ms-excel;charset=utf-8;'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`delivered-orders-${dateText}.xls`; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ── AUDIT LOGS ───────────────────────────────────────────
+  async function loadAuditLogs() {
+    try { const d=await api('/api/audit-logs?limit=30'); auditLogs=d.logs||[]; renderAuditLogs(); } catch {}
+  }
+  function formatAuditAction(log) {
+    if (log.action==='table_added') return `Added table T${log.entityId}`;
+    if (log.action==='table_removed') return `Removed table T${log.entityId}`;
+    if (log.action==='table_status_toggled') return `T${log.entityId} status changed`;
+    if (log.action==='order_status_changed') return `Order #${String(log.entityId).padStart(4,'0')} status updated`;
+    if (log.action==='order_paid') return `Order #${String(log.entityId).padStart(4,'0')} paid`;
+    if (log.action==='order_created') return `New order #${String(log.entityId).padStart(4,'0')}`;
+    return `${log.action}`;
+  }
+  function renderAuditLogs() {
+    const el=document.getElementById('audit-list'); if(!el) return;
+    if (!auditLogs.length) { el.innerHTML='<div class="audit-item"><div class="audit-meta">No activity yet.</div></div>'; return; }
+    el.innerHTML=auditLogs.map(l=>`<div class="audit-item"><div class="audit-main">${esc(formatAuditAction(l))}</div><div class="audit-meta">${new Date(l.createdAt).toLocaleString('en-IN')} · ${esc(l.actor)}</div></div>`).join('');
+  }
+
+  // ── PRINT ─────────────────────────────────────────────────
+  function renderPrintControls() {
+    const btn=document.getElementById('auto-print-toggle'); if(btn) btn.textContent=`Auto Print: ${autoPrintEnabled?'On':'Off'}`;
+  }
+  function toggleAutoPrint() { autoPrintEnabled=!autoPrintEnabled; try{localStorage.setItem(AUTO_PRINT_KEY,autoPrintEnabled?'1':'0');}catch{} renderPrintControls(); }
+  function enqueueAutoPrint(orders) {
+    if (!autoPrintEnabled) return;
+    for (const o of (orders||[]).filter(o=>Number(o?.paid)===1).sort((a,b)=>Number(a.createdAt||0)-Number(b.createdAt||0))) {
+      if (!Number(o?.id)||autoPrintQueue.some(q=>Number(q.id)===Number(o.id))) continue;
+      autoPrintQueue.push(o);
+    }
+    processAutoPrintQueue();
+  }
+  function processAutoPrintQueue() {
+    if (isAutoPrinting||!autoPrintEnabled||!autoPrintQueue.length) return;
+    isAutoPrinting=true;
+    const o=autoPrintQueue.shift();
+    if (Number(o?.paid)!==1) {
+      isAutoPrinting=false;
+      processAutoPrintQueue();
+      return;
+    }
+    const printed=printOrder(o,{silentPopupError:true});
+    if (!printed&&!autoPrintPopupBlockedNotified) { autoPrintPopupBlockedNotified=true; alert('Auto print blocked. Allow popups for this site.'); }
+    setTimeout(()=>{ isAutoPrinting=false; processAutoPrintQueue(); },printed?700:300);
+  }
+  function printLatestOrder() { const orders=getPaidOrders(); if(!orders.length){alert('No orders to print.');return;} printOrder(orders[0]); }
+  function printCounterKot(o,opts={}) {
+    if(!o) return false;
+    const popup=window.open('','_blank','width=420,height=760');
+    if(!popup){if(!opts.silentPopupError)alert('Allow popups to print counter KOT.');return false;}
+    const restoName=esc(state.restaurant?.name||managementAuth?.restaurant?.name||'Restaurant').toUpperCase();
+    const createdAt = Number(o.createdAt || Date.now());
+    const orderNo = esc(String(o.label || o.id || '-').replace(/^#/, ''));
+    const orderTypeText = o.orderType === 'dine' ? 'Dine In' : String(o.orderType || 'Takeaway').replace(/^./, c => c.toUpperCase());
+    const tableNo = o.orderType === 'dine' ? (o.tableNumber || '-') : '-';
+    const pad = (value, size) => String(value || '').slice(0, size).padEnd(size, ' ');
+    const itemRows = (o.items || []).map(item => `${pad(item.name || '', 24)}${String(item.qty || 0).padStart(5, ' ')}`).join('\n');
+    popup.document.write(`<html><head><meta charset="utf-8"/><title>KOT ${esc(o.label||'')}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}body{width:75mm;font-family:'Courier New',monospace;font-size:18px;font-weight:700;color:#000;background:#fff;line-height:1.35}pre{white-space:pre-wrap;margin:0}.c{text-align:center}.title{font-size:24px;font-weight:bold}.subtitle{font-size:20px;font-weight:bold}.sep{font-weight:bold}</style></head><body><pre><div class="sep">========================================</div><div class="c title">${restoName}</div><div class="c subtitle">KOT BILL</div><div class="sep">========================================</div>
+Counter      : 1
+Date         : ${new Date(createdAt).toLocaleDateString('en-GB')}
+Time         : ${new Date(createdAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false})}
+ORDER No.    : ${orderNo}
+
+Order Type   : ${esc(orderTypeText)}
+${o.orderType === 'dine' ? `Table No.    : ${esc(tableNo)}\n` : ''}
+----------------------------------------
+Item                     Qty
+----------------------------------------
+${esc(itemRows || 'No items')}
+
+----------------------------------------
+</pre></body></html>`);
+    popup.document.close();
+    popup.focus();
+    popup.onafterprint = () => setTimeout(()=>popup.close(),100);
+    setTimeout(()=>{
+      popup.print();
+      setTimeout(()=>{ if(!popup.closed) popup.close(); },4000);
+    },Number(opts.printDelay || 250));
+    return true;
+  }
+  function printOrder(o,opts={}) {
+    if(!o) return false;
+    if(Number(o.paid)!==1) {
+      if(!opts.silentPopupError) alert('Bill can be printed only after payment is completed.');
+      return false;
+    }
+    const popup=window.open('','_blank','width=420,height=860');
+    if(!popup){if(!opts.silentPopupError)alert('Allow popups to print.');return false;}
+    const sub=orderSubtotal(o); const parcelCharge=orderParcelCharge(o); const gst=Number(o.gst||o.tax||0); const cgst=Number(o.cgst||(gst/2)); const sgst=Number(o.sgst||(gst-cgst)); const total=Number(o.total||(sub+cgst+sgst));
+    const totalQty=(o.items||[]).reduce((s,i)=>s+Number(i.qty||0),0);
+    const restoName=esc(state.restaurant?.name||managementAuth?.restaurant?.name||'Restaurant');
+    const rows=(o.items||[]).map(i=>`<tr><td class="item-name">${esc(i.name||'')}</td><td style="text-align:right">${i.qty}</td><td style="text-align:right">${money(i.price||0)}</td><td style="text-align:right">${money(Number(i.price)*Number(i.qty))}</td></tr>`).join('');
+    const orderTypeLabel = o.orderType === 'dine' ? 'DINE-IN' : String(o.orderType || 'takeaway').toUpperCase();
+    const tableLine = o.orderType === 'dine' ? `<div class="r"><span>Table :</span><span>${o.tableNumber ? `T${o.tableNumber}` : '-'}</span></div>` : '';
+    popup.document.write(`<html><head><meta charset="utf-8"/><title>${esc(o.label||'Receipt')}</title><style>@page{size:80mm auto;margin:2.5mm}*{box-sizing:border-box}body{width:75mm;font-family:'Courier New',monospace;font-size:18px;font-weight:600;color:#000;background:#fff;line-height:1.35}.c{text-align:center}.title{font-size:28px;font-weight:bold;text-transform:uppercase}.subtitle{font-size:16px;font-weight:bold;text-transform:uppercase}.sep{border-top:2px dashed #000;margin:8px 0}.meta{padding:4px 0}.r{display:flex;justify-content:space-between;gap:8px;margin:3px 0}.r span:last-child{text-align:right}table{width:100%;border-collapse:collapse}th{font-size:16px;font-weight:bold;border-bottom:2px solid #000;padding:4px 0;text-align:left}td{font-size:18px;padding:4px 0}.item-name{font-size:22px;font-weight:bold}.qty,.rate,.amt{text-align:right}.grand{display:flex;justify-content:space-between;font-size:22px;font-weight:bold;border-top:2px solid #000;border-bottom:2px solid #000;padding:8px 0;margin-top:8px}.foot{text-align:center;font-size:16px;margin-top:10px;text-transform:uppercase}</style></head><body><div class="c title">${restoName}</div><div class="c subtitle">TAX INVOICE</div><div class="sep"></div><div class="meta"><div class="r"><span>Order :</span><span>${esc(o.label||'-')}</span></div><div class="r"><span>Date  :</span><span>${new Date(o.createdAt||Date.now()).toLocaleDateString('en-GB')}</span></div><div class="r"><span>Time  :</span><span>${new Date(o.createdAt||Date.now()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true})}</span></div><div class="r"><span>Type  :</span><span>${esc(orderTypeLabel)}</span></div>${tableLine}</div><div class="sep"></div><table><thead><tr><th>Item</th><th class="qty">Qty</th><th class="rate">Rate</th><th class="amt">Amt</th></tr></thead><tbody>${rows}</tbody></table><div class="sep"></div><div class="grand"><span>TOTAL</span><span>${money(total)}</span></div><div class="sep"></div><div class="foot">${o.paid?`PAID VIA ${esc((o.paymentMethod||'').toUpperCase())}`:'PAYMENT PENDING'}</div><div class="foot">THANK YOU!</div><div class="foot">VISIT AGAIN</div></body></html>`);
+    popup.document.close();
+    popup.focus();
+    popup.onafterprint = () => setTimeout(()=>popup.close(),100);
+    setTimeout(()=>{
+      popup.print();
+      setTimeout(()=>{ if(!popup.closed) popup.close(); },4000);
+    },250);
+    return true;
+  }
+
+  function openOuterScreen() {
+    const code = String(state?.restaurant?.code||managementAuth?.restaurant?.code||'').trim();
+    const url = `/outer-screen${code?`?restaurant=${encodeURIComponent(code)}`:''}`;
+    const p = window.open(url,'_blank');
+    if (!p) window.location.href=url;
+  }
+
+  // ── RENDER ALL ───────────────────────────────────────────
+  function safeRender(name, fn) {
+    try { fn(); } catch (e) { console.error(`Render failed: ${name}`, e); }
+  }
+
+  function renderAll() {
+    safeRender('dashboard', renderDashboard);
+    safeRender('kitchen', () => { renderKitchen(); addKitchenPrintButtons(); });
+    safeRender('manualOrder', renderManualOrder);
+    safeRender('tracking', renderTracking);
+    safeRender('menu', renderMenuManagement);
+    safeRender('menuOrders', renderMenuOrders);
+    safeRender('history', renderHistoryTable);
+    safeRender('printControls', renderPrintControls);
+    safeRender('auditLogs', renderAuditLogs);
+  }
+
+  // ── CLOCK ────────────────────────────────────────────────
+  function updateClock() {
+    const el = document.getElementById('clock');
+    if (el) el.textContent = new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  }
+
+  // ── INIT ─────────────────────────────────────────────────
+  (async function init(){
+    updateClock(); setInterval(updateClock,30000);
+    try { const s=localStorage.getItem(AUTO_PRINT_KEY); if(s==='0'||s==='1') autoPrintEnabled=s==='1'; } catch {}
+    try { const s=localStorage.getItem(ORDER_SOUND_KEY); if(s==='0'||s==='1') orderSoundEnabled=s==='1'; } catch {}
+    renderOrderSoundControl();
+    renderOutletLiveControl();
+    renderPrintControls();
+
+    // Set default dates
+    const today=new Date();
+    const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    ['history-export-date','kitchen-date-filter','dashboard-date-filter','menu-orders-date-filter'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value=fmt(today);
+    });
+
+    const drop = document.getElementById('csv-drop');
+    const csvInput = document.getElementById('menu-csv-file');
+    if (drop && csvInput) {
+      drop.onclick = () => csvInput.click();
+      drop.ondragover = e => {
+        e.preventDefault();
+        drop.style.borderColor = '#f46b35';
+      };
+      drop.ondragleave = () => {
+        drop.style.borderColor = '';
+      };
+      drop.ondrop = e => {
+        e.preventDefault();
+        drop.style.borderColor = '';
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.toLowerCase().endsWith('.csv')) {
+          csvInput.files = e.dataTransfer.files;
+          previewMenuCsv();
+        } else {
+          showToast('Drop a CSV file', '#ef4444');
+        }
+      };
+    }
+
+    const persisted=localStorage.getItem(MGMT_TOKEN_KEY);
+    if (persisted) { try { managementAuth=JSON.parse(persisted); } catch { managementAuth=null; } }
+    if (!managementAuth?.token) { showLoginGate(); return; }
+    try { await startSession(); } catch { localStorage.removeItem(MGMT_TOKEN_KEY); showLoginGate('Session expired. Please login.'); }
+  })();
+</script>
+</body>
+</html>
