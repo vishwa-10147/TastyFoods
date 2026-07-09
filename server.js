@@ -1207,10 +1207,10 @@ async function redirectToRestaurantForHost(req, res) {
 }
 
 // Route public entry points directly to the TastyFoods storefront page.
-app.get(['/', '/index.html'], (_req, res) => res.redirect('/tastyfoods'));
-app.get('/client.html', (_req, res) => res.redirect('/tastyfoods'));
-app.get('/restaurants.html', (_req, res) => res.redirect('/tastyfoods'));
-app.get('/tastyfoods', (_req, res) => res.sendFile(path.join(__dirname, 'tastyfoods', 'index.html')));
+app.get(['/', '/index.html', '/client.html', '/restaurants.html', '/tastyfoods', '/tastyfoods/'], (_req, res) =>
+  res.sendFile(path.join(__dirname, 'tastyfoods.html'))
+);
+app.get('/tastyfoods.html', (_req, res) => res.sendFile(path.join(__dirname, 'tastyfoods.html')));
 app.use('/tastyfoods', express.static(path.join(__dirname, 'tastyfoods')));
 
 app.use(express.static(__dirname));
@@ -1267,8 +1267,6 @@ app.get('/client', (_req, res) => res.redirect('/client.html'));
 app.get('/management', (_req, res) => res.redirect('/management.html'));
 app.get('/outer-screen', (_req, res) => res.redirect('/outer-screen.html'));
 app.get('/display', (_req, res) => res.redirect('/outer-screen.html'));
-app.get('/tastyfoods', (_req, res) => res.sendFile(path.join(__dirname, 'tastyfoods', 'index.html')));
-app.use('/tastyfoods', express.static(path.join(__dirname, 'tastyfoods')));
 
 app.get('/api/health', async (_req, res) => {
   try {
