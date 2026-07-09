@@ -29,6 +29,8 @@ if (NODE_ENV === 'production' && !MANAGEMENT_AUTH_SECRET) {
 const MANAGEMENT_SETUP_KEY = String(process.env.MANAGEMENT_SETUP_KEY || '').trim();
 const MANAGEMENT_DEFAULT_PASSWORD = String(process.env.MANAGEMENT_DEFAULT_PASSWORD || '').trim();
 const MANAGEMENT_DEV_FALLBACK_PASSWORD = String(process.env.MANAGEMENT_DEV_FALLBACK_PASSWORD || '').trim() || 'admin123';
+const MANAGEMENT_ADMIN_USERNAME = String(process.env.MANAGEMENT_ADMIN_USERNAME || 'admin').trim().toLowerCase() || 'admin';
+const MANAGEMENT_ADMIN_PASSWORD = String(process.env.MANAGEMENT_ADMIN_PASSWORD || (NODE_ENV === 'production' ? '' : MANAGEMENT_DEV_FALLBACK_PASSWORD)).trim();
 const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.RATE_LIMIT_WINDOW_MS || 60000));
 const RATE_LIMIT_MAX = Math.max(1, Number(process.env.RATE_LIMIT_MAX || 240));
 const APP_START_TIME = Date.now();
@@ -182,12 +184,14 @@ function verifyPassword(password, saltHex, expectedHashHex) {
   }
 }
 
-function createManagementToken({ restaurantId, restaurantCode, restaurantName }) {
+function createManagementToken({ restaurantId, restaurantCode, restaurantName, role, username, isAdmin }) {
   const payload = {
-    restaurantId: Number(restaurantId),
+    restaurantId: Number(restaurantId || 0),
     restaurantCode: String(restaurantCode || ''),
     restaurantName: String(restaurantName || ''),
-    role: String(arguments[0]?.role || 'owner'),
+    role: String(role || (isAdmin ? 'admin' : 'owner')),
+    username: String(username || ''),
+    isAdmin: Boolean(isAdmin),
     iat: Date.now(),
     exp: Date.now() + (24 * 60 * 60 * 1000)
   };
@@ -208,12 +212,14 @@ function parseManagementToken(token) {
   if (!crypto.timingSafeEqual(expectedBuffer, signatureBuffer)) return null;
 
   const payload = JSON.parse(Buffer.from(base, 'base64url').toString('utf8'));
-  if (!payload?.restaurantId || !payload?.exp || Date.now() > Number(payload.exp)) return null;
+  if ((!payload?.restaurantId && !payload?.isAdmin) || !payload?.exp || Date.now() > Number(payload.exp)) return null;
   return {
-    restaurantId: Number(payload.restaurantId),
+    restaurantId: Number(payload.restaurantId || 0),
     restaurantCode: String(payload.restaurantCode || ''),
     restaurantName: String(payload.restaurantName || ''),
-    role: String(payload.role || 'owner')
+    role: String(payload.role || (payload.isAdmin ? 'admin' : 'owner')),
+    username: String(payload.username || ''),
+    isAdmin: Boolean(payload.isAdmin)
   };
 }
 
@@ -225,7 +231,7 @@ function getManagementSession(req) {
 
 function requireManagementAuth(req, res, next) {
   const session = getManagementSession(req);
-  if (!session?.restaurantId) {
+  if (!session?.restaurantId && !session?.isAdmin) {
     return res.status(401).json({ error: 'Management login required' });
   }
   req.management = session;
@@ -612,6 +618,8 @@ async function getOrders(restaurantId = null) {
        o.payment_gateway_payment_id AS "paymentGatewayPaymentId",
        o.source,
        o.external_order_id AS "externalOrderId",
+       r.code AS "restaurantCode",
+       r.name AS "restaurantName",
       o.customer_name AS "customerName",
       o.customer_mobile AS "customerMobile",
        o.delivery_name AS "deliveryName",
@@ -632,9 +640,10 @@ async function getOrders(restaurantId = null) {
          '[]'::json
        ) AS items
      FROM orders o
+     LEFT JOIN restaurants r ON r.id = o.restaurant_id
      LEFT JOIN order_items oi ON oi.order_id = o.id
      ${filter}
-     GROUP BY o.id
+     GROUP BY o.id, r.code, r.name
      ORDER BY o.created_at DESC, o.id DESC`,
     params
   );
@@ -1496,6 +1505,33 @@ app.post('/api/management/login', async (req, res) => {
     return res.status(400).json({ error: 'Restaurant and password are required' });
   }
 
+  const wantsAdmin = ['admin', 'all', 'all-restaurants'].includes(restaurantInput.toLowerCase())
+    || username.toLowerCase() === MANAGEMENT_ADMIN_USERNAME;
+  if (wantsAdmin) {
+    if (!MANAGEMENT_ADMIN_PASSWORD) {
+      return res.status(403).json({ error: 'Admin login is not configured' });
+    }
+    const adminUsername = username || restaurantInput;
+    const validAdmin = adminUsername.toLowerCase() === MANAGEMENT_ADMIN_USERNAME && password === MANAGEMENT_ADMIN_PASSWORD;
+    if (!validAdmin) return res.status(401).json({ error: 'Invalid admin username or password' });
+    const restaurant = { id: 0, code: 'all', name: 'All Restaurants' };
+    return res.json({
+      ok: true,
+      token: createManagementToken({
+        restaurantId: 0,
+        restaurantCode: 'all',
+        restaurantName: 'All Restaurants',
+        role: 'admin',
+        username: MANAGEMENT_ADMIN_USERNAME,
+        isAdmin: true
+      }),
+      restaurant,
+      role: 'admin',
+      username: MANAGEMENT_ADMIN_USERNAME,
+      isAdmin: true
+    });
+  }
+
   const restaurant = await resolveRestaurantByCodeOrName(restaurantInput);
   if (!restaurant?.id) return res.status(401).json({ error: 'Invalid restaurant or password' });
 
@@ -1540,6 +1576,45 @@ app.post('/api/management/login', async (req, res) => {
 });
 
 app.get('/api/management/state', requireManagementAuth, async (req, res) => {
+  if (req.management.isAdmin) {
+    const { rows } = await pool.query(
+      `SELECT id, code, name, address, cuisines,
+              rating, rating_count AS "ratingCount",
+              price_for_two AS "priceForTwo",
+              accepting_orders AS "acceptingOrders",
+              reopen_note AS "reopenNote",
+              image_url AS "imageUrl",
+              site, lat, lng
+       FROM restaurants
+       ORDER BY name ASC`
+    );
+    const restaurants = rows.map(buildRestaurantPayload);
+    const orders = await getOrders(null);
+    return res.json({
+      menu: [],
+      tables: [],
+      orders,
+      restaurants,
+      stats: {
+        restaurants: restaurants.length,
+        openRestaurants: restaurants.filter((restaurant) => restaurant.acceptingOrders !== false).length,
+        closedRestaurants: restaurants.filter((restaurant) => restaurant.acceptingOrders === false).length
+      },
+      restaurant: {
+        id: 0,
+        code: 'all',
+        name: 'All Restaurants',
+        address: '',
+        cuisines: '',
+        rating: 0,
+        ratingCount: '',
+        priceForTwo: 0,
+        acceptingOrders: true,
+        reopenNote: null
+      }
+    });
+  }
+
   const restaurant = await getRestaurantById(req.management.restaurantId);
   return res.json({
     ...(await getState(req.management.restaurantId)),
@@ -1589,6 +1664,7 @@ function requireOwner(req, res, next) {
 
 // List management users for the restaurant
 app.get('/api/management/users', requireManagementAuth, async (req, res) => {
+  if (req.management.isAdmin) return res.json({ users: [] });
   const { rows } = await pool.query(
     `SELECT id, username, role, created_at AS "createdAt" FROM management_users WHERE restaurant_id = $1 ORDER BY id ASC`,
     [req.management.restaurantId]

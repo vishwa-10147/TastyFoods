@@ -976,7 +976,7 @@
         <div class="dash-grid">
           <div class="dash-main">
             <!-- Outlet Toggle -->
-            <div class="card">
+          <div class="card" id="outlet-status-card">
               <div class="card-head">
                 <div class="card-title">Outlet Status</div>
               </div>
@@ -1029,7 +1029,7 @@
             </div>
 
             <!-- Recent Orders -->
-            <div class="card">
+            <div class="card" id="print-controls-card">
               <div class="card-head"><div class="card-title">Recent Orders</div></div>
               <div class="card-body">
                 <div class="orders-list" id="recent"></div>
@@ -1037,7 +1037,7 @@
             </div>
 
             <!-- Print Controls -->
-            <div class="card">
+            <div class="card" id="table-controls-card">
               <div class="card-head"><div class="card-title">Print Controls</div></div>
               <div class="card-body">
                 <div class="print-row">
@@ -1051,7 +1051,7 @@
 
           <div class="dash-side">
             <!-- Table Controls -->
-            <div class="card">
+            <div class="card" id="table-status-card">
               <div class="card-head"><div class="card-title">Tables</div></div>
               <div class="card-body">
                 <div class="print-row" style="margin-bottom:12px;">
@@ -1071,6 +1071,13 @@
             </div>
 
             <div id="ordering-menu-panel"></div>
+
+            <div class="card" id="admin-restaurants-card" style="display:none;">
+              <div class="card-head"><div class="card-title">Restaurants</div></div>
+              <div class="card-body">
+                <div class="orders-list" id="admin-restaurants-list"></div>
+              </div>
+            </div>
 
             <!-- Activity Log -->
             <div class="card">
@@ -1350,6 +1357,10 @@
     return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
+  function isAdminSession() {
+    return managementAuth?.isAdmin === true || String(managementAuth?.role || '').toLowerCase() === 'admin';
+  }
+
   function escAttr(v) {
     return esc(v).replace(/`/g, '&#96;');
   }
@@ -1508,7 +1519,7 @@
       const res = await fetch('/api/management/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       const data = await res.json().catch(()=>({}));
       if (!res.ok) throw new Error(data.error||'Login failed');
-      managementAuth = { token: data.token, restaurant: data.restaurant, role: data.role || 'owner', username: data.username || username || 'owner' };
+      managementAuth = { token: data.token, restaurant: data.restaurant, role: data.role || 'owner', username: data.username || username || 'owner', isAdmin: data.isAdmin === true };
       localStorage.setItem(MGMT_TOKEN_KEY, JSON.stringify(managementAuth));
       document.getElementById('login-password').value = '';
       await startSession();
@@ -1578,7 +1589,30 @@
   function showApp() {
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').classList.add('visible');
-    document.getElementById('rest-chip').textContent = managementAuth?.restaurant?.name || 'Restaurant';
+    document.getElementById('rest-chip').textContent = isAdminSession() ? 'Admin: All Restaurants' : (managementAuth?.restaurant?.name || 'Restaurant');
+    applyAdminUiMode();
+  }
+
+  function applyAdminUiMode() {
+    const admin = isAdminSession();
+    ['manual','menu'].forEach(view => {
+      const item = document.querySelector(`.nav-item[data-view="${view}"]`);
+      if (item) item.style.display = admin ? 'none' : '';
+    });
+    ['outlet-status-card','print-controls-card','table-controls-card','table-status-card','ordering-menu-panel'].forEach(id => {
+      const node = document.getElementById(id);
+      if (node) node.style.display = admin ? 'none' : '';
+    });
+    const adminRestaurants = document.getElementById('admin-restaurants-card');
+    if (adminRestaurants) adminRestaurants.style.display = admin ? 'block' : 'none';
+    const outletBtn = document.getElementById('outlet-live-btn');
+    if (outletBtn) outletBtn.style.display = admin ? 'none' : '';
+    if (admin) {
+      const activeView = document.querySelector('.content.active')?.id?.replace('view-', '');
+      if (['manual','menu'].includes(activeView)) {
+        switchView('dashboard', document.querySelector('.nav-item[data-view="dashboard"]'));
+      }
+    }
   }
 
   // ── API ──────────────────────────────────────────────────
@@ -1774,6 +1808,7 @@
           <div class="order-id">${esc(o.label)}</div>
           <div class="order-tags">${typeBadge(o)}${o.paid?'<span class="tag tag-paid">Paid</span>':'<span class="tag tag-pending">Pending</span>'}</div>
         </div>
+        ${isAdminSession() ? `<div style="font-size:12px;font-weight:800;color:var(--text2);margin-bottom:6px;">${esc(o.restaurantName || o.restaurantCode || 'Restaurant')}</div>` : ''}
         <div class="order-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join(' · ')}</div>
         <div class="order-foot">
           <div class="order-amount">${money(o.total)}</div>
@@ -1827,6 +1862,39 @@
     }
 
     renderTableStatusSwitch();
+    renderAdminRestaurants();
+  }
+
+  function renderAdminRestaurants() {
+    const el = document.getElementById('admin-restaurants-list');
+    if (!el || !isAdminSession()) return;
+    const restaurants = Array.isArray(state.restaurants) ? state.restaurants : [];
+    if (!restaurants.length) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--text3);">No restaurants found.</div>';
+      return;
+    }
+    const orders = state.orders || [];
+    el.innerHTML = restaurants.map((restaurant) => {
+      const restaurantOrders = orders.filter((order) => Number(order.restaurantId) === Number(restaurant.id));
+      const paidOrders = restaurantOrders.filter((order) => Number(order.paid) === 1);
+      const active = paidOrders.filter((order) => order.status !== 'delivered').length;
+      const revenue = paidOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+      return `
+        <div class="order-card">
+          <div class="order-card-head">
+            <div>
+              <div class="order-id">${esc(restaurant.name || restaurant.code)}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:3px;">${esc(restaurant.code)} · ${esc(restaurant.cuisines || 'Cuisine')}</div>
+            </div>
+            <div class="order-tags"><span class="tag ${restaurant.acceptingOrders === false ? 'tag-pending' : 'tag-paid'}">${restaurant.acceptingOrders === false ? 'Closed' : 'Open'}</span></div>
+          </div>
+          <div class="order-foot">
+            <div class="order-amount">${money(revenue)}</div>
+            <div class="order-eta">${active} active · ${paidOrders.length} paid</div>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   async function toggleOutletStatus() {
