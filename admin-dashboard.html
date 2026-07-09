@@ -358,6 +358,25 @@
       min-height: 38px;
       width: 220px;
     }
+    .toggle-filter {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 0 11px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .toggle-filter input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
     .tabs {
       display: flex;
       gap: 4px;
@@ -388,6 +407,34 @@
       overflow: auto;
       border: 1px solid var(--line);
       border-radius: var(--radius);
+    }
+    .order-groups {
+      display: grid;
+      gap: 14px;
+    }
+    .order-date-group {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #fff;
+    }
+    .order-date-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--line);
+    }
+    .order-date-title {
+      font-size: 14px;
+      font-weight: 950;
+    }
+    .order-date-meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
     }
     table {
       width: 100%;
@@ -617,6 +664,11 @@
             <div class="panel-title" id="detail-title">Restaurant details</div>
             <div class="filters">
               <input class="input" id="detail-search" placeholder="Search current tab" />
+              <input class="input" id="order-date-filter" type="date" />
+              <label class="toggle-filter" id="all-orders-toggle-wrap">
+                <input id="all-orders-toggle" type="checkbox" />
+                <span>All orders</span>
+              </label>
               <select class="input" id="order-status-filter">
                 <option value="all">All orders</option>
                 <option value="new">New</option>
@@ -650,6 +702,15 @@
     const money = (v) => `Rs ${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const dateTime = (ms) => ms ? new Date(Number(ms)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const dateKey = (ms) => {
+      const d = new Date(Number(ms || Date.now()));
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const dateLabel = (key) => {
+      const [year, month, day] = String(key || '').split('-').map(Number);
+      if (!year || !month || !day) return 'Unknown date';
+      return new Date(year, month - 1, day).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+    };
 
     function setLoading(on) {
       $('loading')?.classList.toggle('hidden', !on);
@@ -808,7 +869,10 @@
 
     function renderTab() {
       document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === activeTab));
-      $('order-status-filter').style.display = activeTab === 'orders' ? '' : 'none';
+      const isOrders = activeTab === 'orders';
+      $('order-status-filter').style.display = isOrders ? '' : 'none';
+      $('order-date-filter').style.display = isOrders ? '' : 'none';
+      $('all-orders-toggle-wrap').style.display = isOrders ? '' : 'none';
       if (!detail) return renderEmpty('Select a restaurant.');
       if (activeTab === 'orders') return renderOrders();
       if (activeTab === 'menu') return renderMenu();
@@ -823,17 +887,72 @@
     function renderOrders() {
       const q = searchText();
       const status = $('order-status-filter').value;
+      const selectedDate = $('order-date-filter').value || dateKey(Date.now());
+      const showAllOrders = $('all-orders-toggle').checked;
       const orders = (detail.orders || []).filter((order) => {
         const orderStatus = String(order.status || '').toLowerCase();
         const matchStatus = status === 'all' || orderStatus === status;
+        const matchDate = showAllOrders || dateKey(order.createdAt) === selectedDate;
         const haystack = [
           order.label, order.status, order.orderType, order.customerName, order.customerMobile,
           order.deliveryName, order.deliveryMobile, order.notes,
           ...(order.items || []).map((item) => item.name)
         ].join(' ').toLowerCase();
-        return matchStatus && (!q || haystack.includes(q));
+        return matchStatus && matchDate && (!q || haystack.includes(q));
       });
       if (!orders.length) return renderEmpty('No orders match the current filters.');
+      const groups = orders.reduce((acc, order) => {
+        const key = dateKey(order.createdAt);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(order);
+        return acc;
+      }, {});
+      const groupKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+      $('tab-body').innerHTML = `
+        <div class="order-groups">
+          ${groupKeys.map((key) => {
+            const groupOrders = groups[key].sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+            const revenue = groupOrders.filter((order) => Number(order.paid) === 1).reduce((sum, order) => sum + Number(order.total || 0), 0);
+            return `
+              <section class="order-date-group">
+                <div class="order-date-head">
+                  <div class="order-date-title">${esc(dateLabel(key))}</div>
+                  <div class="order-date-meta">${groupOrders.length} orders - ${money(revenue)}</div>
+                </div>
+                <div class="table-wrap" style="border:0;border-radius:0;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Delivery</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${groupOrders.map((order) => `
+                        <tr>
+                          <td><div class="strong">${esc(order.label || `#${order.id}`)}</div><div class="muted">${esc(order.orderType || '-')} ${order.tableNumber ? `- T${order.tableNumber}` : ''}</div></td>
+                          <td><div class="strong">${esc(order.customerName || order.deliveryName || 'Guest')}</div><div class="muted">${esc(order.customerMobile || order.deliveryMobile || '-')}</div></td>
+                          <td>${(order.items || []).map((item) => `<div>${esc(item.name)} x ${Number(item.qty || 0)}</div>`).join('') || '-'}</td>
+                          <td><span class="chip ${order.status === 'delivered' ? 'green' : order.status === 'new' ? 'gold' : ''}">${esc(order.status || '-')}</span></td>
+                          <td><div class="strong">${money(order.total)}</div><div class="muted">${Number(order.paid) === 1 ? `Paid ${esc(order.paymentMethod || '')}` : 'Pending'}</div></td>
+                          <td>${order.orderType === 'delivery' ? `<div>${esc(order.deliveryName || '-')}</div><div class="muted">${esc(order.deliveryMobile || '-')}</div>${order.deliveryLat && order.deliveryLng ? `<a href="https://maps.google.com/?q=${Number(order.deliveryLat)},${Number(order.deliveryLng)}" target="_blank">Map</a>` : ''}` : '<span class="muted">Not delivery</span>'}</td>
+                          <td><div>${dateTime(order.createdAt)}</div><div class="muted">${esc(order.source || 'direct')}</div></td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            `;
+          }).join('')}
+        </div>
+      `;
+      return;
       $('tab-body').innerHTML = `
         <div class="table-wrap">
           <table>
@@ -1037,6 +1156,12 @@
     $('restaurant-status-filter').addEventListener('change', renderRestaurants);
     $('detail-search').addEventListener('input', renderTab);
     $('order-status-filter').addEventListener('change', renderTab);
+    $('order-date-filter').value = dateKey(Date.now());
+    $('order-date-filter').addEventListener('change', () => {
+      $('all-orders-toggle').checked = false;
+      renderTab();
+    });
+    $('all-orders-toggle').addEventListener('change', renderTab);
     $('refresh-btn').addEventListener('click', loadOverview);
     $('logout-btn').addEventListener('click', () => logout('Logged out.'));
     document.querySelectorAll('.tab').forEach((tab) => {
