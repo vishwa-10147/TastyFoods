@@ -1305,13 +1305,22 @@
     try { return Number(localStorage.getItem(CLIENT_LAST_ORDER_KEY) || 0) || 0; } catch { return 0; }
   }
 
+  function getCartItemsForRestaurant(code = selectedRestaurantCode) {
+    return cart.filter((item) => String(item.restaurantCode || selectedRestaurantCode) === String(code || selectedRestaurantCode));
+  }
+
   function draftKey() {
-    return `${DRAFT_KEY_PREFIX}${String(selectedRestaurantCode || 'default').trim() || 'default'}`;
+    return `${DRAFT_KEY_PREFIX}global`;
   }
 
   function saveDraft() {
     const d = {
-      cart: cart.map(l => ({ menuItemId: Number(l.menuItemId), qty: Number(l.qty) })),
+      cart: cart.map((l) => ({
+        menuItemId: Number(l.menuItemId),
+        qty: Number(l.qty),
+        restaurantCode: String(l.restaurantCode || selectedRestaurantCode),
+        restaurantName: String(l.restaurantName || '')
+      })),
       notes: String(document.getElementById('notes')?.value || ''),
       orderType: String(orderType),
       scheduleDate: String(document.getElementById('schedule-date')?.value || ''),
@@ -1338,12 +1347,14 @@
     if (dateIn && d.scheduleDate) dateIn.value = d.scheduleDate;
     if (timeIn && d.scheduleTime) timeIn.value = d.scheduleTime;
     if (notesIn) notesIn.value = String(d.notes || '');
-    const menuMap = new Map((appState.menu || []).map(m => [Number(m.id), m]));
-    cart = (Array.isArray(d.cart) ? d.cart : []).map(l => {
-      const item = menuMap.get(Number(l.menuItemId));
-      if (!item || Number(item.available) !== 1 || l.qty <= 0) return null;
-      return { menuItemId: Number(item.id), name: item.name, price: Number(item.price), qty: Number(l.qty) };
-    }).filter(Boolean);
+    cart = (Array.isArray(d.cart) ? d.cart : []).map((l) => ({
+      menuItemId: Number(l.menuItemId),
+      name: String(l.name || ''),
+      price: Number(l.price || 0),
+      qty: Number(l.qty || 0),
+      restaurantCode: String(l.restaurantCode || selectedRestaurantCode),
+      restaurantName: String(l.restaurantName || '')
+    })).filter((l) => Number(l.qty || 0) > 0);
   }
 
   function setSelectedTracking(id) {
@@ -1593,7 +1604,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
 
   // ── MENU ─────────────────────────────────────────────────
   function renderMenu() {
-    const qtyMap = new Map(cart.map(l => [Number(l.menuItemId), Number(l.qty)]));
+    const activeCart = getCartItemsForRestaurant(selectedRestaurantCode);
+    const qtyMap = new Map(activeCart.map((l) => [Number(l.menuItemId), Number(l.qty)]));
     const items = currentCat === 'all' ? appState.menu : appState.menu.filter(m => m.cat === currentCat);
     const grid = document.getElementById('menu-grid');
     if (!grid) return;
@@ -1824,19 +1836,22 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   function addToCart(menuItemId) {
     const item = appState.menu.find(m => m.id === menuItemId && Number(m.available) === 1);
     if (!item) { showWarn('This item is currently unavailable.'); return; }
-    const ex = cart.find(c => c.menuItemId === menuItemId);
+    const restaurantCode = String(selectedRestaurantCode || '');
+    const restaurantName = String(appState.restaurant?.name || selectedRestaurant()?.name || 'Restaurant');
+    const ex = cart.find((c) => Number(c.menuItemId) === Number(menuItemId) && String(c.restaurantCode || selectedRestaurantCode) === restaurantCode);
     if (ex) ex.qty++;
-    else cart.push({ menuItemId, name: item.name, price: Number(item.price), qty: 1 });
+    else cart.push({ menuItemId: Number(menuItemId), name: item.name, price: Number(item.price), qty: 1, restaurantCode, restaurantName });
     afterCartUpdate(menuItemId);
   }
 
   function updateCartQty(menuItemId, delta) {
     const id = Number(menuItemId); const d = Number(delta);
     if (!id || !d) return;
-    const line = cart.find(l => Number(l.menuItemId) === id);
+    const restaurantCode = String(selectedRestaurantCode || '');
+    const line = cart.find((l) => Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === restaurantCode);
     if (!line) { if (d > 0) addToCart(id); return; }
     const next = Number(line.qty) + d;
-    if (next <= 0) cart = cart.filter(l => Number(l.menuItemId) !== id);
+    if (next <= 0) cart = cart.filter((l) => !(Number(l.menuItemId) === id && String(l.restaurantCode || selectedRestaurantCode) === restaurantCode));
     else line.qty = next;
     afterCartUpdate(id);
   }
@@ -1851,24 +1866,32 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function syncCartWithMenu() {
-    const avail = new Map((appState.menu || []).filter(m => Number(m.available) === 1).map(m => [Number(m.id), m]));
-    cart = cart.filter(l => avail.has(Number(l.menuItemId))).map(l => {
+    const restaurantCode = String(selectedRestaurantCode || '');
+    const avail = new Map((appState.menu || []).filter((m) => Number(m.available) === 1).map((m) => [Number(m.id), m]));
+    cart = cart.filter((l) => {
+      if (String(l.restaurantCode || selectedRestaurantCode) !== restaurantCode) return true;
       const s = avail.get(Number(l.menuItemId));
-      return { ...l, name: s.name, price: Number(s.price) };
+      if (!s) return false;
+      l.name = s.name;
+      l.price = Number(s.price);
+      return true;
     });
     saveDraft();
   }
 
   function cartHTML() {
     if (!cart.length) return `<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div>Nothing added yet</div><div style="font-size:11px;color:var(--ink-xl);">Tap + on any item to start</div></div>`;
-    return cart.map(i => `
+    return cart.map((i) => `
       <div class="cart-item">
         <div class="c-qty-ctrl">
           <button class="c-qty-btn" onclick="updateCartQty(${i.menuItemId},-1)">−</button>
           <div class="c-qty-val">${i.qty}</div>
           <button class="c-qty-btn" onclick="updateCartQty(${i.menuItemId},1)">+</button>
         </div>
-        <div class="c-name">${esc(i.name)}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="c-name">${esc(i.name)}</div>
+          <div style="font-size:11px;color:var(--ink-l);margin-top:3px;">${esc(i.restaurantName || i.restaurantCode || 'Restaurant')}</div>
+        </div>
         <div class="c-price">${money(i.price * i.qty)}</div>
       </div>
     `).join('');
@@ -1879,8 +1902,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function totalsHTML() {
-    const itemsTotal = cart.reduce((s,i) => s + i.price * i.qty, 0);
-    const parcelCharge = cart.length ? parcelChargeForType() : 0;
+    const activeItems = getCartItemsForRestaurant(selectedRestaurantCode);
+    const itemsTotal = activeItems.reduce((s,i) => s + i.price * i.qty, 0);
+    const parcelCharge = activeItems.length ? parcelChargeForType() : 0;
     const inclusive = itemsTotal + parcelCharge;
     const sub = Number((inclusive / 1.05).toFixed(2));
     const gst = Number((inclusive - sub).toFixed(2));
@@ -1902,7 +1926,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     if (parcelEl) parcelEl.textContent = money(parcelCharge);
     const items = document.getElementById('cart-items');
     if (items) items.innerHTML = cartHTML();
-    const count = cart.reduce((s,i) => s + i.qty, 0);
+    const count = getCartItemsForRestaurant(selectedRestaurantCode).reduce((s,i) => s + i.qty, 0);
     const badge = document.getElementById('cart-count-badge');
     if (badge) badge.textContent = String(count);
     const mob = document.getElementById('cart-mobile-badge');
@@ -1932,7 +1956,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   function syncMobileCartFab() {
     const fab = document.getElementById('mobile-cart-fab');
     if (!fab) return;
-    const count = cart.reduce((s,i) => s + i.qty, 0);
+    const count = getCartItemsForRestaurant(selectedRestaurantCode).reduce((s,i) => s + i.qty, 0);
     const isMobile = window.innerWidth <= 900;
     if (isMobile && count > 0) {
       fab.style.display = 'block';
@@ -2019,7 +2043,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const restaurant = appState.restaurant || selectedRestaurant();
     if (restaurant?.acceptingOrders === false) { alert('Outlet not accepting orders.'); return; }
     syncCartWithMenu(); renderCart();
-    if (!cart.length) { showWarn('Add items to place an order.'); return; }
+    const activeItems = getCartItemsForRestaurant(selectedRestaurantCode);
+    if (!activeItems.length) { showWarn('Add items from this restaurant to place an order.'); return; }
     const customerName = String(document.getElementById('customer-name')?.value || '').trim();
     const customerMobile = String(document.getElementById('customer-mobile')?.value || '').trim();
     if (!customerName || !customerMobile) { alert('Please enter your name and mobile number.'); return; }
@@ -2033,7 +2058,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const payload = {
       restaurantCode: selectedRestaurantCode, orderType,
       tableNumber: null, notes, customerName, customerMobile,
-      items: cart.map(i => ({ menuItemId: i.menuItemId, qty: i.qty }))
+      items: activeItems.map((i) => ({ menuItemId: i.menuItemId, qty: i.qty }))
     };
     if (orderType === 'delivery') { payload.deliveryLat = deliveryLocation.lat; payload.deliveryLng = deliveryLocation.lng; }
     try {
@@ -2045,8 +2070,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
       rememberOrder(res.order.id);
       setPendingPayment(res.order.id);
       setSelectedTracking(res.order.id);
-      cart = []; document.getElementById('notes').value = '';
-      clearDraft(); renderCart(); syncMobileCartFab();
+      cart = cart.filter((item) => String(item.restaurantCode || selectedRestaurantCode) !== String(selectedRestaurantCode));
+      document.getElementById('notes').value = '';
+      saveDraft(); renderCart(); syncMobileCartFab();
       if (PAYMENT_TEST_MODE) switchView('tracking', null);
       else switchView('payment', null);
       renderPayment();
