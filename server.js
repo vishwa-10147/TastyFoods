@@ -1206,10 +1206,11 @@ async function redirectToRestaurantForHost(req, res) {
   return res.redirect(`/${defaultRestaurant.code}`);
 }
 
-// Route public entry points directly to the restaurant ordering app.
-app.get(['/', '/index.html', '/client.html'], redirectToRestaurantForHost);
+// Route public entry points directly to the TastyFoods storefront page.
+app.get(['/', '/index.html'], (_req, res) => res.redirect('/tastyfoods'));
+app.get('/client.html', (_req, res) => res.redirect('/tastyfoods'));
 
-app.get('/restaurants.html', (_req, res) => res.redirect('/'));
+app.get('/restaurants.html', (_req, res) => res.redirect('/tastyfoods'));
 
 app.use(express.static(__dirname));
 // Support pretty restaurant URLs without changing the visible path.
