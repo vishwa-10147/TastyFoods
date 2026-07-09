@@ -432,6 +432,38 @@
       grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
       gap: 12px;
     }
+    .menu-create {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 110px 1fr 1.2fr 110px;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-2);
+    }
+    .menu-edit {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .menu-edit-row {
+      display: grid;
+      grid-template-columns: 1fr 96px;
+      gap: 8px;
+    }
+    .menu-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .small-input {
+      min-height: 36px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
     .item-card {
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -499,6 +531,8 @@
       .topbar { height: auto; align-items: flex-start; flex-direction: column; padding: 16px; }
       .content { padding: 16px; }
       .metrics { grid-template-columns: 1fr; }
+      .menu-create { grid-template-columns: 1fr; }
+      .menu-edit-row { grid-template-columns: 1fr; }
       .filters { justify-content: stretch; }
       .filters .input, .filters select { width: 100%; }
     }
@@ -838,8 +872,21 @@
         const haystack = `${item.name || ''} ${item.desc || ''} ${item.description || ''} ${item.cat || ''}`.toLowerCase();
         return !q || haystack.includes(q);
       });
-      if (!items.length) return renderEmpty('No menu items match the current search.');
-      $('tab-body').innerHTML = `<div class="menu-grid">${items.map((item) => `
+      const createForm = `
+        <form class="menu-create" id="menu-create-form" onsubmit="createAdminMenuItem(event)">
+          <input class="input small-input" name="name" placeholder="Item name" required>
+          <input class="input small-input" name="description" placeholder="Description">
+          <input class="input small-input" name="price" type="number" min="1" step="1" placeholder="Price" required>
+          <input class="input small-input" name="category" placeholder="Category" value="other" required>
+          <input class="input small-input" name="imageUrl" placeholder="Image URL or /data/uploads/...">
+          <button class="primary-btn" type="submit" style="min-height:36px;margin:0;">Add item</button>
+        </form>
+      `;
+      if (!items.length) {
+        $('tab-body').innerHTML = `${createForm}<div class="empty">No menu items match the current search.</div>`;
+        return;
+      }
+      $('tab-body').innerHTML = `${createForm}<div class="menu-grid">${items.map((item) => `
         <article class="item-card">
           <div class="item-image">${item.imageUrl ? `<img src="${esc(item.imageUrl)}" alt="${esc(item.name)}">` : 'No image'}</div>
           <div class="item-body">
@@ -850,9 +897,100 @@
               <span class="strong">${money(item.price)}</span>
             </div>
             <div style="margin-top:8px;"><span class="chip ${Number(item.available) === 1 ? 'green' : 'red'}">${Number(item.available) === 1 ? 'Available' : 'Unavailable'}</span></div>
+            <form class="menu-edit" onsubmit="saveAdminMenuItem(event, ${Number(item.id)})">
+              <input class="input small-input" name="name" value="${esc(item.name)}" placeholder="Name" required>
+              <input class="input small-input" name="description" value="${esc(item.desc || item.description || '')}" placeholder="Description">
+              <div class="menu-edit-row">
+                <input class="input small-input" name="category" value="${esc(item.cat || 'other')}" placeholder="Category" required>
+                <input class="input small-input" name="price" type="number" min="1" step="1" value="${Number(item.price || 0)}" placeholder="Price" required>
+              </div>
+              <input class="input small-input" name="imageUrl" value="${esc(item.imageUrl || '')}" placeholder="Image URL or /data/uploads/...">
+              <select class="input small-input" name="available">
+                <option value="1" ${Number(item.available) === 1 ? 'selected' : ''}>Available</option>
+                <option value="0" ${Number(item.available) !== 1 ? 'selected' : ''}>Unavailable</option>
+              </select>
+              <div class="menu-actions">
+                <button class="primary-btn" type="submit" style="min-height:36px;margin:0;">Save</button>
+                <button class="ghost-btn" type="button" onclick="deleteAdminMenuItem(${Number(item.id)}, '${esc(String(item.name || '')).replace(/&#39;/g, "\\'")}')">Delete</button>
+              </div>
+            </form>
           </div>
         </article>
       `).join('')}</div>`;
+    }
+
+    function menuPayloadFromForm(form) {
+      return {
+        name: form.elements.name.value.trim(),
+        description: form.elements.description.value.trim(),
+        price: Number(form.elements.price.value || 0),
+        category: form.elements.category.value.trim(),
+        imageUrl: form.elements.imageUrl.value.trim(),
+        available: form.elements.available ? form.elements.available.value === '1' : true
+      };
+    }
+
+    async function reloadSelectedRestaurant() {
+      if (!selectedRestaurantId) return;
+      detail = await api(`/api/management/admin/restaurants/${selectedRestaurantId}`);
+      renderHeader();
+      renderMetrics();
+      renderTab();
+    }
+
+    async function createAdminMenuItem(event) {
+      event.preventDefault();
+      if (!selectedRestaurantId) return;
+      const form = event.currentTarget;
+      const payload = menuPayloadFromForm(form);
+      try {
+        setLoading(true);
+        await api(`/api/management/admin/restaurants/${selectedRestaurantId}/menu`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        form.reset();
+        form.elements.category.value = 'other';
+        await reloadSelectedRestaurant();
+      } catch (error) {
+        alert(error.message || 'Failed to add menu item');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function saveAdminMenuItem(event, itemId) {
+      event.preventDefault();
+      if (!selectedRestaurantId || !itemId) return;
+      const payload = menuPayloadFromForm(event.currentTarget);
+      try {
+        setLoading(true);
+        await api(`/api/management/admin/restaurants/${selectedRestaurantId}/menu/${itemId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+        await reloadSelectedRestaurant();
+      } catch (error) {
+        alert(error.message || 'Failed to update menu item');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function deleteAdminMenuItem(itemId, name) {
+      if (!selectedRestaurantId || !itemId) return;
+      if (!confirm(`Delete "${name || 'this item'}" from the menu?`)) return;
+      try {
+        setLoading(true);
+        await api(`/api/management/admin/restaurants/${selectedRestaurantId}/menu/${itemId}`, {
+          method: 'DELETE'
+        });
+        await reloadSelectedRestaurant();
+      } catch (error) {
+        alert(error.message || 'Failed to delete menu item');
+      } finally {
+        setLoading(false);
+      }
     }
 
     function renderPictures() {

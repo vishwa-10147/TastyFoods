@@ -1806,6 +1806,114 @@ app.get('/api/management/admin/restaurants/:id', requireManagementAuth, requireA
   });
 });
 
+app.post('/api/management/admin/restaurants/:id/menu', requireManagementAuth, requireAdmin, async (req, res) => {
+  const restaurantId = Number(req.params.id);
+  const name = String(req.body?.name || '').trim();
+  const description = String(req.body?.desc || req.body?.description || '').trim() || 'Custom menu item';
+  const price = Math.round(Number(req.body?.price || 0));
+  const emoji = String(req.body?.emoji || 'plate').trim() || 'plate';
+  const category = String(req.body?.cat || req.body?.category || 'other').trim().toLowerCase() || 'other';
+  const available = !(req.body?.available === false || req.body?.available === 0 || req.body?.available === '0');
+  const imageUrl = String(req.body?.imageUrl || '').trim() || null;
+  const actor = `${getActor(req)}:admin`;
+
+  if (!restaurantId) return res.status(400).json({ error: 'Invalid restaurant id' });
+  if (!await getRestaurantById(restaurantId)) return res.status(404).json({ error: 'Restaurant not found' });
+  if (!name) return res.status(400).json({ error: 'Menu item name is required' });
+  if (!Number.isFinite(price) || price <= 0) return res.status(400).json({ error: 'Price must be greater than 0' });
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl) && !imageUrl.startsWith('/data/uploads/')) {
+    return res.status(400).json({ error: 'Image URL must be http(s) or an uploaded /data/uploads path' });
+  }
+
+  const created = await pool.query(
+    `INSERT INTO menu_items (restaurant_id, name, description, price, emoji, category, image_url, available)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, name, description, price, emoji, category AS cat, image_url AS "imageUrl", available`,
+    [restaurantId, name, description, price, emoji, category, imageUrl, available]
+  );
+  const item = created.rows[0];
+
+  await logAudit(pool, {
+    action: 'admin_menu_item_added',
+    entityType: 'menu_item',
+    entityId: item.id,
+    actor,
+    restaurantId,
+    details: { name, price, cat: category }
+  });
+  await broadcastState(restaurantId);
+  return res.status(201).json({ ok: true, item });
+});
+
+app.patch('/api/management/admin/restaurants/:id/menu/:menuItemId', requireManagementAuth, requireAdmin, async (req, res) => {
+  const restaurantId = Number(req.params.id);
+  const menuItemId = Number(req.params.menuItemId);
+  const name = String(req.body?.name || '').trim();
+  const description = String(req.body?.desc || req.body?.description || '').trim();
+  const price = Math.round(Number(req.body?.price || 0));
+  const emoji = String(req.body?.emoji || 'plate').trim() || 'plate';
+  const category = String(req.body?.cat || req.body?.category || '').trim().toLowerCase();
+  const available = !(req.body?.available === false || req.body?.available === 0 || req.body?.available === '0');
+  const imageUrl = String(req.body?.imageUrl || '').trim() || null;
+  const actor = `${getActor(req)}:admin`;
+
+  if (!restaurantId || !menuItemId) return res.status(400).json({ error: 'Invalid restaurant or menu item id' });
+  if (!name) return res.status(400).json({ error: 'Menu item name is required' });
+  if (!Number.isFinite(price) || price <= 0) return res.status(400).json({ error: 'Price must be greater than 0' });
+  if (!category) return res.status(400).json({ error: 'Category is required' });
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl) && !imageUrl.startsWith('/data/uploads/')) {
+    return res.status(400).json({ error: 'Image URL must be http(s) or an uploaded /data/uploads path' });
+  }
+
+  const result = await pool.query(
+    `UPDATE menu_items
+     SET name = $1, description = $2, price = $3, category = $4, emoji = $5, available = $6, image_url = $7
+     WHERE id = $8 AND restaurant_id = $9
+     RETURNING id, name, description, price, emoji, category AS cat, image_url AS "imageUrl", available`,
+    [name, description || 'Custom menu item', price, category, emoji, available, imageUrl, menuItemId, restaurantId]
+  );
+  const item = result.rows[0];
+  if (!item) return res.status(404).json({ error: 'Menu item not found' });
+
+  await logAudit(pool, {
+    action: 'admin_menu_item_updated',
+    entityType: 'menu_item',
+    entityId: menuItemId,
+    actor,
+    restaurantId,
+    details: { name: item.name, price: Number(item.price), cat: item.cat, available: item.available }
+  });
+  await broadcastState(restaurantId);
+  return res.json({ ok: true, item });
+});
+
+app.delete('/api/management/admin/restaurants/:id/menu/:menuItemId', requireManagementAuth, requireAdmin, async (req, res) => {
+  const restaurantId = Number(req.params.id);
+  const menuItemId = Number(req.params.menuItemId);
+  const actor = `${getActor(req)}:admin`;
+  if (!restaurantId || !menuItemId) return res.status(400).json({ error: 'Invalid restaurant or menu item id' });
+
+  const result = await pool.query(
+    `DELETE FROM menu_items
+     WHERE id = $1 AND restaurant_id = $2
+     RETURNING id, name, price, category, image_url AS "imageUrl"`,
+    [menuItemId, restaurantId]
+  );
+  const item = result.rows[0];
+  if (!item) return res.status(404).json({ error: 'Menu item not found' });
+
+  await logAudit(pool, {
+    action: 'admin_menu_item_deleted',
+    entityType: 'menu_item',
+    entityId: menuItemId,
+    actor,
+    restaurantId,
+    details: { name: item.name, price: Number(item.price), cat: item.category }
+  });
+  await broadcastState(restaurantId);
+  return res.json({ ok: true });
+});
+
 app.get('/api/menu', async (req, res) => {
   const restaurant = await resolveRestaurantByCodeOrName(String(req.query.restaurant || 'gandikotadosa').trim()) || await resolveRestaurantByCode('gandikotadosa');
   return res.json(await getMenu(restaurant.id));
