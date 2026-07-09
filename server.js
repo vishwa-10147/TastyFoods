@@ -1209,8 +1209,9 @@ async function redirectToRestaurantForHost(req, res) {
 // Route public entry points directly to the TastyFoods storefront page.
 app.get(['/', '/index.html'], (_req, res) => res.redirect('/tastyfoods'));
 app.get('/client.html', (_req, res) => res.redirect('/tastyfoods'));
-
 app.get('/restaurants.html', (_req, res) => res.redirect('/tastyfoods'));
+app.get('/tastyfoods', (_req, res) => res.sendFile(path.join(__dirname, 'tastyfoods', 'index.html')));
+app.use('/tastyfoods', express.static(path.join(__dirname, 'tastyfoods')));
 
 app.use(express.static(__dirname));
 // Support pretty restaurant URLs without changing the visible path.
@@ -1222,7 +1223,7 @@ app.get(['/r/:code', '/:code'], async (req, res, next) => {
 
     // reserved paths that should continue to static or other routes
     const reserved = new Set([
-      'api', 'client.html', 'management', 'management.html', 'restaurants.html', 'index.html', 'outer-screen.html', 'display', 'data', '_redirects', 'favicon.ico'
+      'api', 'client.html', 'management', 'management.html', 'restaurants.html', 'index.html', 'outer-screen.html', 'display', 'data', '_redirects', 'favicon.ico', 'tastyfoods'
     ]);
     if (reserved.has(maybe.toLowerCase())) return next();
 
