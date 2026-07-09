@@ -95,6 +95,18 @@
     }
     .auth-inp:focus { border-color: var(--fire); }
     .auth-inp::placeholder { color: var(--text3); }
+    .auth-site-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .auth-site-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px;
+      background: var(--fire-l); color: var(--fire-d);
+      font-size: 11px; font-weight: 700;
+      border: 1px solid rgba(249,115,22,0.2);
+      white-space: nowrap;
+    }
     .auth-submit {
       width: 100%; padding: 12px; border-radius: var(--radius);
       background: var(--fire); color: white; border: none;
@@ -856,11 +868,14 @@
         <div class="auth-panel" id="auth-panel-register">
           <input class="auth-inp" id="register-restaurant" placeholder="Restaurant code (e.g. gandikotadosa)" />
           <input class="auth-inp" id="register-restaurant-name" placeholder="Display name (e.g. Gandikota Dosa)" />
-          <select class="auth-inp" id="register-site">
-            <option value="new">New</option>
-            <option value="gandikota">Gandikota</option>
-            <option value="tastyfoods">TastyFoods</option>
-          </select>
+          <div class="auth-site-row">
+            <select class="auth-inp" id="register-site">
+              <option value="new">New</option>
+              <option value="gandikota">Gandikota</option>
+              <option value="tastyfoods">TastyFoods</option>
+            </select>
+            <span class="auth-site-pill" id="register-site-pill">Site: New</span>
+          </div>
           <input class="auth-inp" id="register-password" type="password" placeholder="Password" />
           <input class="auth-inp" id="register-confirm-password" type="password" placeholder="Confirm password" />
           <input class="auth-inp" id="register-setup-key" type="password" placeholder="Setup key (required after first account)" />
@@ -1476,6 +1491,7 @@
       document.getElementById(`auth-tab-${m}`).classList.toggle('active', m===mode);
       document.getElementById(`auth-panel-${m}`).classList.toggle('active', m===mode);
     });
+    if (mode === 'register') updateRegisterSitePill();
   }
 
   async function loginManagement() {
@@ -1497,6 +1513,14 @@
       document.getElementById('login-password').value = '';
       await startSession();
     } catch(e) { err.textContent = e.message||'Login failed'; }
+  }
+
+  function updateRegisterSitePill() {
+    const select = document.getElementById('register-site');
+    const pill = document.getElementById('register-site-pill');
+    if (!select || !pill) return;
+    const label = select.value === 'gandikota' ? 'Gandikota' : select.value === 'tastyfoods' ? 'TastyFoods' : 'New';
+    pill.textContent = `Site: ${label}`;
   }
 
   async function registerManagement() {
@@ -1527,6 +1551,14 @@
       await loginManagement();
     } catch(e) { err.textContent = e.message||'Registration failed'; }
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const siteSelect = document.getElementById('register-site');
+    if (siteSelect) {
+      siteSelect.addEventListener('change', updateRegisterSitePill);
+      updateRegisterSitePill();
+    }
+  });
 
   function logoutManagement() {
     localStorage.removeItem(MGMT_TOKEN_KEY);
