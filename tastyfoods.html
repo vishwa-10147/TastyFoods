@@ -1301,6 +1301,7 @@
   let selectedTrackingOrderId = null;
   let pendingPaymentOrderId = null;
   let pendingCartSnapshot = null;
+  let paymentSummaryOverrides = {};
   let selectedPaymentMethod = 'card';
   let razorpayConfig = { enabled: false, keyId: null };
   let currentCartTotal = 0;
@@ -1482,16 +1483,27 @@
     showWarn('Cart restored. You can edit it before checkout.');
   }
 
-  function changeSummaryItemQuantity(menuItemId, delta, restaurantCode) {
+  function changeSummaryItemQuantity(menuItemId, delta, restaurantCode, currentQty, scope = 'current') {
     const id = Number(menuItemId);
     if (!id) return;
-    const target = cart.find((item) => Number(item.menuItemId) === id && String(item.restaurantCode || selectedRestaurantCode) === String(restaurantCode || selectedRestaurantCode));
-    if (!target) return;
-    const nextQty = Number(target.qty || 0) + Number(delta || 0);
-    if (nextQty <= 0) {
-      cart = cart.filter((item) => !(Number(item.menuItemId) === id && String(item.restaurantCode || selectedRestaurantCode) === String(restaurantCode || selectedRestaurantCode)));
+    const nextQty = Math.max(0, Number(currentQty || 0) + Number(delta || 0));
+    const key = String(restaurantCode || '');
+    if (!key) return;
+    if (scope === 'current') {
+      if (!pendingCartSnapshot) return;
+      if (nextQty <= 0) {
+        pendingCartSnapshot.items = pendingCartSnapshot.items.filter((item) => !(Number(item.menuItemId) === id && String(item.restaurantCode || selectedRestaurantCode) === key));
+      } else {
+        const target = pendingCartSnapshot.items.find((item) => Number(item.menuItemId) === id && String(item.restaurantCode || selectedRestaurantCode) === key);
+        if (target) target.qty = nextQty;
+      }
     } else {
-      target.qty = nextQty;
+      if (!paymentSummaryOverrides[key]) paymentSummaryOverrides[key] = { closed: false, items: {} };
+      if (nextQty <= 0) {
+        paymentSummaryOverrides[key].items[id] = 0;
+      } else {
+        paymentSummaryOverrides[key].items[id] = nextQty;
+      }
     }
     saveDraft();
     renderCart();
@@ -1499,10 +1511,16 @@
     renderPayment();
   }
 
-  function closeRestaurantSummaryCard(restaurantCode) {
+  function closeRestaurantSummaryCard(restaurantCode, scope = 'current') {
     const key = String(restaurantCode || '');
     if (!key) return;
-    cart = cart.filter((item) => String(item.restaurantCode || selectedRestaurantCode) !== key);
+    if (scope === 'current') {
+      if (pendingCartSnapshot) {
+        pendingCartSnapshot.items = pendingCartSnapshot.items.filter((item) => String(item.restaurantCode || selectedRestaurantCode) !== key);
+      }
+    } else {
+      paymentSummaryOverrides[key] = { closed: true, items: {} };
+    }
     saveDraft();
     renderCart();
     syncMobileCartFab();
@@ -2375,23 +2393,44 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     return unpaid;
   }
 
-  function groupedOrderSummaryMarkup(orders, heading, showEditCartButton = false) {
-    if (!orders.length) return '';
+  function buildCurrentCartSummaryGroups() {
+    if (!pendingCartSnapshot?.items?.length) return [];
+    const grouped = new Map();
+    pendingCartSnapshot.items.forEach((item) => {
+      const restaurantKey = String(item.restaurantCode || selectedRestaurantCode || '');
+      const restaurantName = String(item.restaurantName || getRestaurantNameById(restaurantKey) || 'Restaurant');
+      const entry = grouped.get(restaurantKey) || { restaurantKey, restaurantName, total: 0, items: [] };
+      entry.items.push({ menuItemId: Number(item.menuItemId), name: String(item.name || ''), qty: Number(item.qty || 0), price: Number(item.price || 0) });
+      entry.total += Number(item.price || 0) * Number(item.qty || 0);
+      grouped.set(restaurantKey, entry);
+    });
+    return Array.from(grouped.values());
+  }
+
+  function buildPreviousOrderSummaryGroups(orders) {
     const grouped = new Map();
     orders.forEach((order) => {
       const restaurantKey = String(order.restaurantCode || order.restaurantId || '');
+      if (paymentSummaryOverrides[restaurantKey]?.closed) return;
       const restaurantName = String(order.restaurantName || getRestaurantNameById(order.restaurantCode || order.restaurantId || selectedRestaurantCode));
-      const entry = grouped.get(restaurantKey) || { restaurantName, total: 0, items: [] };
+      const entry = grouped.get(restaurantKey) || { restaurantKey, restaurantName, total: 0, items: [] };
       entry.total += Number(order.total || 0);
       (order.items || []).forEach((item) => {
+        const overrideQty = paymentSummaryOverrides[restaurantKey]?.items?.[Number(item.menuItemId)];
+        const qty = overrideQty == null ? Number(item.qty || 0) : Number(overrideQty || 0);
+        if (qty <= 0) return;
         const existing = entry.items.find((line) => Number(line.menuItemId) === Number(item.menuItemId));
-        if (existing) existing.qty += Number(item.qty || 0);
-        else entry.items.push({ menuItemId: Number(item.menuItemId), name: String(item.name || ''), qty: Number(item.qty || 0), price: Number(item.price || 0) });
+        if (existing) existing.qty += qty;
+        else entry.items.push({ menuItemId: Number(item.menuItemId), name: String(item.name || ''), qty, price: Number(item.price || 0) });
       });
       grouped.set(restaurantKey, entry);
     });
+    return Array.from(grouped.values()).filter((group) => group.items.length);
+  }
 
-    const cards = Array.from(grouped.values()).map((group, index) => `
+  function groupedOrderSummaryMarkup(groups, heading, showEditCartButton = false, scope = 'previous') {
+    if (!groups.length) return '';
+    const cards = groups.map((group) => `
       <div class="receipt-card">
         <div class="receipt-head">
           <div class="summary-card-head">
@@ -2399,7 +2438,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
               <div class="receipt-brand">${esc(group.restaurantName)}</div>
               <div class="receipt-tag">${group.items.reduce((sum, item) => sum + Number(item.qty || 0), 0)} item${group.items.reduce((sum, item) => sum + Number(item.qty || 0), 0) === 1 ? '' : 's'}</div>
             </div>
-            <button class="summary-close-btn" onclick="closeRestaurantSummaryCard('${esc(String(orders[index]?.restaurantCode || orders[index]?.restaurantId || ''))}')" title="Close bill">×</button>
+            <button class="summary-close-btn" onclick="closeRestaurantSummaryCard('${esc(group.restaurantKey)}', '${scope}')" title="Close bill">×</button>
           </div>
         </div>
         <div class="receipt-body">
@@ -2408,9 +2447,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
             <div class="r-table-row">
               <span>${esc(item.name)}</span>
               <span style="display:flex;align-items:center;justify-content:flex-end;gap:6px;">
-                <button class="mini-qty-btn" onclick="changeSummaryItemQuantity(${Number(item.menuItemId)}, -1, '${esc(String(orders[index]?.restaurantCode || orders[index]?.restaurantId || selectedRestaurantCode))}')">−</button>
+                <button class="mini-qty-btn" onclick="changeSummaryItemQuantity(${Number(item.menuItemId)}, -1, '${esc(group.restaurantKey)}', ${Number(item.qty || 0)}, '${scope}')">−</button>
                 <span>${item.qty}</span>
-                <button class="mini-qty-btn" onclick="changeSummaryItemQuantity(${Number(item.menuItemId)}, 1, '${esc(String(orders[index]?.restaurantCode || orders[index]?.restaurantId || selectedRestaurantCode))}')">+</button>
+                <button class="mini-qty-btn" onclick="changeSummaryItemQuantity(${Number(item.menuItemId)}, 1, '${esc(group.restaurantKey)}', ${Number(item.qty || 0)}, '${scope}')">+</button>
               </span>
               <span>${money(Number(item.price || 0) * Number(item.qty || 0))}</span>
             </div>
@@ -2437,6 +2476,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const currentIds = new Set((pendingCartSnapshot?.orderIds || []).map(Number).filter(Boolean));
     const currentOrders = orders.filter((order) => currentIds.has(Number(order.id)));
     const previousOrders = orders.filter((order) => !currentIds.has(Number(order.id)));
+    const currentGroups = buildCurrentCartSummaryGroups();
+    const previousGroups = buildPreviousOrderSummaryGroups(previousOrders);
     const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
     const restaurantCount = new Set(orders.map((order) => String(order.restaurantCode || order.restaurantId || ''))).size;
     return `
@@ -2446,8 +2487,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
           <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:800;color:var(--ink);">${money(total)}</div>
           <div style="font-size:13px;color:var(--ink-m);margin-top:4px;">${orders.length} order${orders.length > 1 ? 's' : ''} across ${restaurantCount} restaurant${restaurantCount > 1 ? 's' : ''}</div>
         </div>
-        ${currentOrders.length ? groupedOrderSummaryMarkup(currentOrders, 'Current cart', true) : ''}
-        ${previousOrders.length ? groupedOrderSummaryMarkup(previousOrders, 'Pending from earlier') : ''}
+        ${currentGroups.length ? groupedOrderSummaryMarkup(currentGroups, 'Current cart', true, 'current') : ''}
+        ${previousGroups.length ? groupedOrderSummaryMarkup(previousGroups, 'Pending from earlier', false, 'previous') : ''}
       </div>
     `;
   }
