@@ -1289,6 +1289,7 @@
   let orderType = 'dine';
   let selectedTrackingOrderId = null;
   let pendingPaymentOrderId = null;
+  let pendingCartSnapshot = null;
   let selectedPaymentMethod = 'card';
   let razorpayConfig = { enabled: false, keyId: null };
   let currentCartTotal = 0;
@@ -1452,6 +1453,22 @@
     } else {
       try { localStorage.removeItem(CLIENT_PENDING_ORDER_KEY); } catch {}
     }
+  }
+
+  function editPendingCartFromSummary() {
+    if (!pendingCartSnapshot) {
+      switchView('order', null);
+      return;
+    }
+    cart = (pendingCartSnapshot.items || []).map((item) => ({ ...item }));
+    const notesEl = document.getElementById('notes');
+    if (notesEl) notesEl.value = pendingCartSnapshot.notes || '';
+    if (pendingCartSnapshot.orderType) applyOrderTypeUI(pendingCartSnapshot.orderType);
+    saveDraft();
+    renderCart();
+    syncMobileCartFab();
+    switchView('order', null);
+    showWarn('Cart restored. You can edit it before checkout.');
   }
 
   function clientOrders() {
@@ -2209,6 +2226,13 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
       createdOrders.forEach((order) => rememberOrder(order.id));
       const latestOrderId = createdOrders[createdOrders.length - 1]?.id;
       const firstPendingOrderId = createdOrders.find((order) => Number(order.paid) !== 1)?.id || latestOrderId;
+      pendingCartSnapshot = {
+        createdAt: Date.now(),
+        orderIds: createdOrders.map((order) => Number(order.id)).filter(Boolean),
+        items: cart.map((item) => ({ ...item })),
+        notes: baseNotes,
+        orderType
+      };
       setPendingPayment(firstPendingOrderId);
       setSelectedTracking(latestOrderId || firstPendingOrderId);
       cart = [];
@@ -2300,15 +2324,67 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
 
   function payableOrders() {
     const unpaid = clientOrders().filter(o => Number(o.paid) !== 1);
-    if (unpaid.length) return unpaid;
-    const pending = appState.orders.find(o => Number(o.id) === Number(pendingPaymentOrderId) && Number(o.paid) !== 1);
-    return pending ? [pending] : [];
+    if (!unpaid.length) {
+      const pending = appState.orders.find(o => Number(o.id) === Number(pendingPaymentOrderId) && Number(o.paid) !== 1);
+      return pending ? [pending] : [];
+    }
+    if (pendingCartSnapshot?.orderIds?.length) {
+      const currentIds = new Set(pendingCartSnapshot.orderIds.map(Number).filter(Boolean));
+      const currentOrders = unpaid.filter((order) => currentIds.has(Number(order.id)));
+      if (currentOrders.length) return currentOrders;
+    }
+    return unpaid;
+  }
+
+  function groupedOrderSummaryMarkup(orders, heading, showEditCartButton = false) {
+    if (!orders.length) return '';
+    const grouped = new Map();
+    orders.forEach((order) => {
+      const restaurantKey = String(order.restaurantCode || order.restaurantId || '');
+      const restaurantName = String(order.restaurantName || getRestaurantNameById(order.restaurantCode || order.restaurantId || selectedRestaurantCode));
+      const entry = grouped.get(restaurantKey) || { restaurantName, total: 0, items: [] };
+      entry.total += Number(order.total || 0);
+      (order.items || []).forEach((item) => {
+        const existing = entry.items.find((line) => Number(line.menuItemId) === Number(item.menuItemId));
+        if (existing) existing.qty += Number(item.qty || 0);
+        else entry.items.push({ menuItemId: Number(item.menuItemId), name: String(item.name || ''), qty: Number(item.qty || 0), price: Number(item.price || 0) });
+      });
+      grouped.set(restaurantKey, entry);
+    });
+
+    const cards = Array.from(grouped.values()).map((group) => `
+      <div class="receipt-card">
+        <div class="receipt-head">
+          <div class="receipt-brand">${esc(group.restaurantName)}</div>
+          <div class="receipt-tag">${group.items.reduce((sum, item) => sum + Number(item.qty || 0), 0)} item${group.items.reduce((sum, item) => sum + Number(item.qty || 0), 0) === 1 ? '' : 's'}</div>
+        </div>
+        <div class="receipt-body">
+          <div class="r-table-head"><span>Item</span><span>Qty</span><span>Amount</span></div>
+          ${group.items.map((item) => `<div class="r-table-row"><span>${esc(item.name)}</span><span>${item.qty}</span><span>${money(Number(item.price || 0) * Number(item.qty || 0))}</span></div>`).join('')}
+          <div class="receipt-divider"></div>
+          <div class="receipt-grand"><span>Subtotal</span><span>${money(group.total)}</span></div>
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div style="display:grid;gap:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--clay-d);">${esc(heading)}</div>
+          ${showEditCartButton ? `<button class="retry-btn" onclick="editPendingCartFromSummary()" style="padding:8px 12px;">Edit cart</button>` : ''}
+        </div>
+        ${cards}
+      </div>
+    `;
   }
 
   function paymentSummaryMarkup(orders) {
     if (!orders.length) return '<div style="font-size:13px;color:var(--ink-l);">No pending order found.</div>';
+    const currentIds = new Set((pendingCartSnapshot?.orderIds || []).map(Number).filter(Boolean));
+    const currentOrders = orders.filter((order) => currentIds.has(Number(order.id)));
+    const previousOrders = orders.filter((order) => !currentIds.has(Number(order.id)));
     const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
-    const restaurantCount = new Set(orders.map(o => String(o.restaurantCode || o.restaurantId || ''))).size;
+    const restaurantCount = new Set(orders.map((order) => String(order.restaurantCode || order.restaurantId || ''))).size;
     return `
       <div style="display:grid;gap:12px;">
         <div style="padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--clay-l);">
@@ -2316,7 +2392,8 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
           <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:800;color:var(--ink);">${money(total)}</div>
           <div style="font-size:13px;color:var(--ink-m);margin-top:4px;">${orders.length} order${orders.length > 1 ? 's' : ''} across ${restaurantCount} restaurant${restaurantCount > 1 ? 's' : ''}</div>
         </div>
-        ${orders.map((order) => receiptMarkup(order)).join('')}
+        ${currentOrders.length ? groupedOrderSummaryMarkup(currentOrders, 'Current cart', true) : ''}
+        ${previousOrders.length ? groupedOrderSummaryMarkup(previousOrders, 'Pending from earlier') : ''}
       </div>
     `;
   }
@@ -2365,6 +2442,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
               const updatedIds = new Set(v.orders.map(o => Number(o.id)));
               appState.orders = [...(v.orders || []), ...(appState.orders || []).filter(o => !updatedIds.has(Number(o.id)))];
             }
+            pendingCartSnapshot = null;
             setPendingPayment(0);
             renderPayment(); renderTracking();
           } catch (err) { alert(err.message || 'Verification failed'); }
