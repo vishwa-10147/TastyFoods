@@ -1114,7 +1114,7 @@ async function initDatabase() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
-        restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        restaurant_id INTEGER,
         order_type TEXT NOT NULL,
         table_number INTEGER,
         notes TEXT NOT NULL DEFAULT '',
@@ -1133,6 +1133,29 @@ async function initDatabase() {
         customer_mobile TEXT
       )
     `);
+
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS restaurant_id INTEGER`);
+
+    const defaultRestaurant = await client.query(`SELECT id FROM restaurants ORDER BY id ASC LIMIT 1`);
+    const fallbackRestaurantId = Number(defaultRestaurant.rows[0]?.id || 0);
+    if (fallbackRestaurantId) {
+      await client.query(`UPDATE orders SET restaurant_id = $1 WHERE restaurant_id IS NULL`, [fallbackRestaurantId]);
+    }
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'orders_restaurant_id_fkey'
+        ) THEN
+          ALTER TABLE orders
+            ADD CONSTRAINT orders_restaurant_id_fkey
+            FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    await client.query(`ALTER TABLE orders ALTER COLUMN restaurant_id SET NOT NULL`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS order_items (

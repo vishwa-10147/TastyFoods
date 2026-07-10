@@ -17,5 +17,22 @@ DELETE FROM restaurants WHERE code = 'default' AND id NOT IN (
   SELECT MIN(id) FROM restaurants WHERE code = 'default' GROUP BY code
 );
 
--- Step 4: Verify all restaurants
+-- Step 4: Ensure orders are linked to a restaurant
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS restaurant_id INTEGER;
+UPDATE orders SET restaurant_id = (SELECT id FROM restaurants ORDER BY id ASC LIMIT 1)
+WHERE restaurant_id IS NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'orders_restaurant_id_fkey'
+  ) THEN
+    ALTER TABLE orders
+      ADD CONSTRAINT orders_restaurant_id_fkey
+      FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+ALTER TABLE orders ALTER COLUMN restaurant_id SET NOT NULL;
+
+-- Step 5: Verify all restaurants
 SELECT id, code, name, address FROM restaurants ORDER BY created_at DESC;
+SELECT id, restaurant_id, status FROM orders ORDER BY id DESC LIMIT 20;
