@@ -930,6 +930,7 @@
                         <th>Payment</th>
                         <th>Delivery</th>
                         <th>Time</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -942,6 +943,7 @@
                           <td><div class="strong">${money(order.total)}</div><div class="muted">${Number(order.paid) === 1 ? `Paid ${esc(order.paymentMethod || '')}` : 'Pending'}</div></td>
                           <td>${order.orderType === 'delivery' ? `<div>${esc(order.deliveryName || '-')}</div><div class="muted">${esc(order.deliveryMobile || '-')}</div>${order.deliveryLat && order.deliveryLng ? `<a href="https://maps.google.com/?q=${Number(order.deliveryLat)},${Number(order.deliveryLng)}" target="_blank">Map</a>` : ''}` : '<span class="muted">Not delivery</span>'}</td>
                           <td><div>${dateTime(order.createdAt)}</div><div class="muted">${esc(order.source || 'direct')}</div></td>
+                          <td><button class="ghost-btn" type="button" onclick="deleteAdminOrder(${Number(order.id)}, '${esc(String(order.label || `#${order.id}`)).replace(/'/g, "\\'")}')">Delete</button></td>
                         </tr>
                       `).join('')}
                     </tbody>
@@ -965,6 +967,7 @@
                 <th>Payment</th>
                 <th>Delivery</th>
                 <th>Time</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -977,6 +980,7 @@
                   <td><div class="strong">${money(order.total)}</div><div class="muted">${Number(order.paid) === 1 ? `Paid ${esc(order.paymentMethod || '')}` : 'Pending'}</div></td>
                   <td>${order.orderType === 'delivery' ? `<div>${esc(order.deliveryName || '-')}</div><div class="muted">${esc(order.deliveryMobile || '-')}</div>${order.deliveryLat && order.deliveryLng ? `<a href="https://maps.google.com/?q=${Number(order.deliveryLat)},${Number(order.deliveryLng)}" target="_blank">Map</a>` : ''}` : '<span class="muted">Not delivery</span>'}</td>
                   <td><div>${dateTime(order.createdAt)}</div><div class="muted">${esc(order.source || 'direct')}</div></td>
+                  <td><button class="ghost-btn" type="button" onclick="deleteAdminOrder(${Number(order.id)}, '${esc(String(order.label || `#${order.id}`)).replace(/'/g, "\\'")}')">Delete</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -1055,6 +1059,20 @@
       renderHeader();
       renderMetrics();
       renderTab();
+    }
+
+    async function deleteAdminOrder(orderId, label) {
+      if (!selectedRestaurantId || !orderId) return;
+      if (!confirm(`Delete order ${label || orderId}?`)) return;
+      try {
+        setLoading(true);
+        await api(`/api/management/admin/orders/${orderId}`, { method: 'DELETE' });
+        await loadOverview();
+      } catch (error) {
+        alert(error.message || 'Failed to delete order');
+      } finally {
+        setLoading(false);
+      }
     }
 
     async function createAdminMenuItem(event) {

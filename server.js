@@ -962,6 +962,50 @@ async function markOrderPaid({ orderId, actor, paymentMethod, paymentGatewayOrde
   }
 }
 
+async function deleteOrderById({ orderId, actor }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const orderResult = await client.query(
+      `SELECT id, restaurant_id AS "restaurantId", order_type AS "orderType", table_number AS "tableNumber", status
+       FROM orders
+       WHERE id = $1
+       FOR UPDATE`,
+      [orderId]
+    );
+    const order = orderResult.rows[0];
+    if (!order) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    if ((String(order.orderType) === 'dine' || String(order.orderType) === 'preorder') && order.tableNumber) {
+      await client.query(
+        'UPDATE table_status SET status = $1 WHERE restaurant_id = $2 AND table_number = $3',
+        ['free', Number(order.restaurantId), Number(order.tableNumber)]
+      );
+    }
+
+    await client.query('DELETE FROM orders WHERE id = $1', [orderId]);
+    await logAudit(client, {
+      action: 'order_deleted',
+      entityType: 'order',
+      entityId: orderId,
+      actor,
+      restaurantId: Number(order.restaurantId),
+      details: { orderType: order.orderType, tableNumber: order.tableNumber, status: order.status }
+    });
+
+    await client.query('COMMIT');
+    return { id: Number(order.id), restaurantId: Number(order.restaurantId) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function broadcastState(restaurantId) {
   if (restaurantId) {
     io.emit('state:update', await getState(restaurantId));
@@ -2370,6 +2414,21 @@ app.post('/api/orders', async (req, res) => {
     return res.status(201).json({ order: createdOrder });
   } catch (error) {
     return res.status(400).json({ error: error.message || 'Unable to create order' });
+  }
+});
+
+app.delete('/api/management/admin/orders/:id', requireManagementAuth, requireAdmin, async (req, res) => {
+  const orderId = Number(req.params.id);
+  if (!orderId) return res.status(400).json({ error: 'Invalid order id' });
+
+  const actor = `${getActor(req)}:admin`;
+  try {
+    const deleted = await deleteOrderById({ orderId, actor });
+    if (!deleted) return res.status(404).json({ error: 'Order not found' });
+    await broadcastState(deleted.restaurantId);
+    return res.json({ ok: true, deletedOrderId: deleted.id });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Failed to delete order' });
   }
 });
 

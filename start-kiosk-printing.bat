@@ -1,11 +1,15 @@
 @echo off
 setlocal
 
-set "APP_URL=https://www.gandikotadosa.in/management.html"
+set "APP_URL=https://tastytables.in/management.html"
 set "CHROME_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
 
 if not exist "%CHROME_EXE%" (
   set "CHROME_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+)
+
+if not exist "%CHROME_EXE%" (
+  set "CHROME_EXE=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
 )
 
 if not exist "%CHROME_EXE%" (
@@ -15,4 +19,4 @@ if not exist "%CHROME_EXE%" (
   exit /b 1
 )
 
-start "" "%CHROME_EXE%" --kiosk-printing --user-data-dir="%TEMP%\foodorder-kiosk-printing" "%APP_URL%"
+start "" "%CHROME_EXE%" --kiosk-printing --start-maximized --new-window "%APP_URL%"
