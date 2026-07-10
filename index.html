@@ -2040,51 +2040,74 @@
     renderPayment();
   }
 
+  function payableOrders() {
+    const unpaid = clientOrders().filter(o => Number(o.paid) !== 1);
+    if (unpaid.length) return unpaid;
+    const pending = appState.orders.find(o => Number(o.id) === Number(pendingPaymentOrderId) && Number(o.paid) !== 1);
+    return pending ? [pending] : [];
+  }
+
+  function paymentSummaryMarkup(orders) {
+    if (!orders.length) return '<div style="font-size:13px;color:var(--ink-l);">No pending order found.</div>';
+    const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const restaurantCount = new Set(orders.map(o => String(o.restaurantCode || o.restaurantId || ''))).size;
+    return `
+      <div style="display:grid;gap:12px;">
+        <div style="padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--clay-l);">
+          <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--clay-d);margin-bottom:6px;">Grand Total</div>
+          <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:800;color:var(--ink);">${money(total)}</div>
+          <div style="font-size:13px;color:var(--ink-m);margin-top:4px;">${orders.length} order${orders.length > 1 ? 's' : ''} across ${restaurantCount} restaurant${restaurantCount > 1 ? 's' : ''}</div>
+        </div>
+        ${orders.map((order) => receiptMarkup(order)).join('')}
+      </div>
+    `;
+  }
+
   // ── PAYMENT ───────────────────────────────────────────────
   function renderPayment() {
-    const orders = clientOrders().sort((a,b) => Number(b.createdAt||0) - Number(a.createdAt||0));
-    const selected = orders.find(o => Number(o.id) === Number(pendingPaymentOrderId));
-    const lastId = getLastOrderId();
-    const latest = orders.find(o => Number(o.id) === lastId);
-    const unpaid = orders.find(o => Number(o.paid) !== 1);
-    const order = selected || latest || unpaid || orders[0] || null;
+    const orders = payableOrders().sort((a,b) => Number(b.createdAt||0) - Number(a.createdAt||0));
     const sum = document.getElementById('pay-summary');
     const btn = document.getElementById('pay-btn');
-    if (!order) {
+    if (!orders.length) {
       sum.innerHTML = '<div style="font-size:13px;color:var(--ink-l);">No pending order found.</div>';
       btn.disabled = true; btn.textContent = 'Pay with Card / UPI'; return;
     }
-    const isPending = Number(order.paid) !== 1;
-    if (isPending) setPendingPayment(order.id);
-    btn.disabled = PAYMENT_TEST_MODE || !isPending;
-    btn.textContent = PAYMENT_TEST_MODE ? 'Payment disabled for testing' : isPending ? '💳 Pay with Card / UPI' : 'Already Paid';
-    sum.innerHTML = receiptMarkup(order);
+    const pendingOrderIds = orders.map(o => Number(o.id)).filter(Boolean);
+    if (pendingOrderIds.length) setPendingPayment(pendingOrderIds[0]);
+    btn.disabled = PAYMENT_TEST_MODE || !orders.length;
+    btn.textContent = PAYMENT_TEST_MODE ? 'Payment disabled for testing' : '💳 Pay Grand Total';
+    sum.innerHTML = paymentSummaryMarkup(orders);
   }
 
   async function payOrder() {
     if (PAYMENT_TEST_MODE) { alert('Payment disabled for testing.'); return; }
-    if (!pendingPaymentOrderId) return;
+    const orders = payableOrders();
+    if (!orders.length) { alert('No pending orders found.'); return; }
+    const orderIds = orders.map(o => Number(o.id)).filter(Boolean);
+    if (!orderIds.length) { alert('No pending orders found.'); return; }
     try {
-      const order = appState.orders.find(o => o.id === pendingPaymentOrderId);
-      if (!order) { alert('Order not found.'); return; }
+      const customerMobile = String(document.getElementById('customer-mobile')?.value || '').trim();
       if (!razorpayConfig.enabled || !razorpayConfig.keyId) { alert('Payment not configured. Please configure Razorpay.'); return; }
-      const gateway = await api(`/api/orders/${pendingPaymentOrderId}/razorpay-order`, 'POST', { paymentMethod: selectedPaymentMethod });
+      const gateway = await api('/api/orders/razorpay-order', 'POST', { orderIds, paymentMethod: selectedPaymentMethod, customerMobile });
       const rzp = new Razorpay({
         key: gateway.keyId, amount: gateway.amountPaise,
         currency: gateway.currency || 'INR', name: 'Tableside',
-        description: `Payment for ${order.label}`, order_id: gateway.gatewayOrderId,
+        description: `Payment for ${orderIds.length} order${orderIds.length > 1 ? 's' : ''}`, order_id: gateway.gatewayOrderId,
         handler: async function(response) {
           try {
-            const v = await api(`/api/orders/${pendingPaymentOrderId}/razorpay/verify`, 'POST', {
+            const v = await api('/api/orders/razorpay/verify', 'POST', {
+              orderIds,
               paymentMethod: selectedPaymentMethod,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature
+              razorpaySignature: response.razorpay_signature,
+              customerMobile
             });
-            if (v?.order?.id) {
-              appState.orders = [v.order, ...(appState.orders||[]).filter(o => Number(o.id) !== Number(v.order.id))];
+            if (v?.orders?.length) {
+              const updatedIds = new Set(v.orders.map(o => Number(o.id)));
+              appState.orders = [...(v.orders || []), ...(appState.orders||[]).filter(o => !updatedIds.has(Number(o.id)))];
             }
-            if (Number(v?.order?.paid) === 1) setPendingPayment(0);
+            setPendingPayment(0);
             renderPayment(); renderTracking();
           } catch (err) { alert(err.message || 'Verification failed'); }
         }
