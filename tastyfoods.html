@@ -2298,6 +2298,29 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     renderPayment();
   }
 
+  function payableOrders() {
+    const unpaid = clientOrders().filter(o => Number(o.paid) !== 1);
+    if (unpaid.length) return unpaid;
+    const pending = appState.orders.find(o => Number(o.id) === Number(pendingPaymentOrderId) && Number(o.paid) !== 1);
+    return pending ? [pending] : [];
+  }
+
+  function paymentSummaryMarkup(orders) {
+    if (!orders.length) return '<div style="font-size:13px;color:var(--ink-l);">No pending order found.</div>';
+    const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const restaurantCount = new Set(orders.map(o => String(o.restaurantCode || o.restaurantId || ''))).size;
+    return `
+      <div style="display:grid;gap:12px;">
+        <div style="padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--clay-l);">
+          <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--clay-d);margin-bottom:6px;">Combined Payment</div>
+          <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:800;color:var(--ink);">${money(total)}</div>
+          <div style="font-size:13px;color:var(--ink-m);margin-top:4px;">${orders.length} order${orders.length > 1 ? 's' : ''} across ${restaurantCount} restaurant${restaurantCount > 1 ? 's' : ''}</div>
+        </div>
+        ${orders.map((order) => receiptMarkup(order)).join('')}
+      </div>
+    `;
+  }
+
   // ── PAYMENT ───────────────────────────────────────────────
   function renderPayment() {
     const orders = clientOrders().sort((a,b) => Number(b.createdAt||0) - Number(a.createdAt||0));

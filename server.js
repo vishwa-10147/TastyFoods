@@ -390,6 +390,13 @@ function getGatewayErrorMessage(error, fallbackMessage) {
   return code ? `${message} (${code})` : message;
 }
 
+function normalizeOrderIds(input) {
+  const values = Array.isArray(input) ? input : String(input || '').split(',');
+  return Array.from(new Set(values
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0)));
+}
+
 function toIstDateKey(timestampMs) {
   const date = new Date(Number(timestampMs || Date.now()) + (5.5 * 60 * 60 * 1000));
   const yyyy = date.getUTCFullYear();
@@ -2452,6 +2459,160 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
 
 app.get('/api/payments/razorpay/config', (_req, res) => {
   return res.json({ enabled: RAZORPAY_ENABLED, keyId: RAZORPAY_ENABLED ? RAZORPAY_KEY_ID : null });
+});
+
+app.post('/api/orders/razorpay-order', async (req, res) => {
+  try {
+    if (!RAZORPAY_ENABLED || !razorpay) return res.status(400).json({ error: 'Razorpay is not configured' });
+
+    const orderIds = normalizeOrderIds(req.body?.orderIds);
+    if (!orderIds.length) return res.status(400).json({ error: 'No orders selected for payment' });
+
+    const actor = getActor(req);
+    const session = getManagementSession(req);
+    const orders = [];
+    for (const orderId of orderIds) {
+      const order = await getOrderById(orderId);
+      if (!order) return res.status(404).json({ error: `Order ${orderId} not found` });
+      if (Number(order.paid) === 1) continue;
+      orders.push(order);
+    }
+    if (!orders.length) return res.status(400).json({ error: 'All selected orders are already paid' });
+
+    if (session) {
+      if (orders.some((order) => Number(order.restaurantId) !== Number(session.restaurantId))) {
+        return res.status(403).json({ error: 'Not allowed' });
+      }
+    } else {
+      const customerMobile = String(req.body?.customerMobile || req.query?.customerMobile || '').trim();
+      if (!customerMobile || orders.some((order) => !order.customerMobile || String(order.customerMobile) !== customerMobile)) {
+        return res.status(403).json({ error: 'Payment can only be initiated by the order owner' });
+      }
+    }
+
+    const amountPaise = Math.round(orders.reduce((sum, order) => sum + Number(order.total || 0), 0) * 100);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      return res.status(400).json({ error: 'Invalid order amount' });
+    }
+
+    const gatewayOrder = await razorpay.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `orders_${orders[0].id}_${Date.now()}`,
+      notes: {
+        appOrderIds: orders.map((order) => order.id).join(','),
+        appOrderLabels: orders.map((order) => order.label || '').filter(Boolean).join(', ')
+      }
+    });
+
+    const now = Date.now();
+    await pool.query(
+      'UPDATE orders SET payment_gateway_order_id = $1, updated_at = $2 WHERE id = ANY($3::int[])',
+      [gatewayOrder.id, now, orders.map((order) => Number(order.id))]
+    );
+    for (const order of orders) {
+      await logAudit(pool, {
+        action: 'payment_gateway_order_created',
+        entityType: 'order',
+        entityId: order.id,
+        actor,
+        restaurantId: order.restaurantId,
+        details: { gateway: 'razorpay', gatewayOrderId: gatewayOrder.id, amountPaise, combinedOrderIds: orders.map((entry) => entry.id) }
+      });
+    }
+
+    await Promise.all(Array.from(new Set(orders.map((order) => Number(order.restaurantId)))).map((restaurantId) => broadcastState(restaurantId)));
+    return res.json({
+      keyId: RAZORPAY_KEY_ID,
+      gatewayOrderId: gatewayOrder.id,
+      amountPaise,
+      currency: 'INR',
+      orders: await Promise.all(orders.map((order) => getOrderById(order.id)))
+    });
+  } catch (error) {
+    const message = getGatewayErrorMessage(error, 'Unable to create Razorpay order');
+    console.error('Combined Razorpay order creation failed:', message);
+    return res.status(400).json({ error: message });
+  }
+});
+
+app.post('/api/orders/razorpay/verify', async (req, res) => {
+  try {
+    if (!RAZORPAY_ENABLED || !razorpay) return res.status(400).json({ error: 'Razorpay is not configured' });
+
+    const orderIds = normalizeOrderIds(req.body?.orderIds);
+    if (!orderIds.length) return res.status(400).json({ error: 'No orders selected for payment' });
+
+    const actor = getActor(req);
+    const session = getManagementSession(req);
+    const razorpayOrderId = String(req.body?.razorpayOrderId || '').trim();
+    const razorpayPaymentId = String(req.body?.razorpayPaymentId || '').trim();
+    const razorpaySignature = String(req.body?.razorpaySignature || '').trim();
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({ error: 'Missing Razorpay verification fields' });
+    }
+
+    const orders = [];
+    for (const orderId of orderIds) {
+      const order = await getOrderById(orderId);
+      if (!order) return res.status(404).json({ error: `Order ${orderId} not found` });
+      if (Number(order.paid) === 1) continue;
+      if (order.paymentGatewayOrderId && order.paymentGatewayOrderId !== razorpayOrderId) {
+        return res.status(400).json({ error: `Gateway order mismatch for ${order.label || order.id}` });
+      }
+      orders.push(order);
+    }
+    if (!orders.length) return res.status(400).json({ error: 'All selected orders are already paid' });
+
+    if (session) {
+      if (orders.some((order) => Number(order.restaurantId) !== Number(session.restaurantId))) {
+        return res.status(403).json({ error: 'Not allowed' });
+      }
+    } else {
+      const customerMobile = String(req.body?.customerMobile || '').trim();
+      if (!customerMobile || orders.some((order) => !order.customerMobile || String(order.customerMobile) !== customerMobile)) {
+        return res.status(403).json({ error: 'Payment can only be verified by the order owner' });
+      }
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+    if (expectedSignature !== razorpaySignature) {
+      return res.status(400).json({ error: 'Invalid Razorpay signature' });
+    }
+
+    const payment = await razorpay.payments.fetch(razorpayPaymentId);
+    const expectedAmountPaise = Math.round(orders.reduce((sum, order) => sum + Number(order.total || 0), 0) * 100);
+    if (Number(payment.amount || 0) !== expectedAmountPaise) {
+      return res.status(400).json({ error: 'Razorpay amount mismatch' });
+    }
+    if (String(payment.order_id || '') !== razorpayOrderId) {
+      return res.status(400).json({ error: 'Razorpay order reference mismatch' });
+    }
+    if (!['captured', 'authorized'].includes(String(payment.status || '').toLowerCase())) {
+      return res.status(400).json({ error: 'Payment not completed yet' });
+    }
+
+    const updatedOrders = [];
+    for (const order of orders) {
+      const updatedOrder = await markOrderPaid({
+        orderId: order.id,
+        actor,
+        paymentMethod: String(payment.method || req.body?.paymentMethod || 'online').trim().toLowerCase(),
+        paymentGatewayOrderId: razorpayOrderId,
+        paymentGatewayPaymentId: razorpayPaymentId
+      });
+      updatedOrders.push(updatedOrder);
+    }
+    await Promise.all(Array.from(new Set(updatedOrders.map((order) => Number(order.restaurantId)))).map((restaurantId) => broadcastState(restaurantId)));
+    return res.json({ ok: true, orders: updatedOrders });
+  } catch (error) {
+    const message = getGatewayErrorMessage(error, 'Razorpay verification failed');
+    console.error('Combined Razorpay verification failed:', message);
+    return res.status(400).json({ error: message });
+  }
 });
 
 app.post('/api/orders/:id/razorpay-order', async (req, res) => {
