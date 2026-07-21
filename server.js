@@ -42,7 +42,7 @@ const RAZORPAY_KEY_ID = String(process.env.RAZORPAY_KEY_ID || '').trim();
 const RAZORPAY_KEY_SECRET = String(process.env.RAZORPAY_KEY_SECRET || '').trim();
 const RAZORPAY_WEBHOOK_SECRET = String(process.env.RAZORPAY_WEBHOOK_SECRET || '').trim();
 const RAZORPAY_ENABLED = Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET);
-const PARCEL_CHARGE_AMOUNT = 5;
+const PARCEL_CHARGE_AMOUNT = 10;
 
 if (!DATABASE_URL) {
   throw new Error('DATABASE_URL is required for PostgreSQL.');
@@ -434,13 +434,14 @@ function enrichOrder(order) {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemsTotal = Number(items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0));
   const parcelCharge = getParcelCharge(order.orderType || order.order_type);
-  const inclusiveTotal = itemsTotal + parcelCharge;
-  const subtotal = Math.round((inclusiveTotal / 1.05) * 100) / 100;
-  const gst = Math.round((inclusiveTotal - subtotal) * 100) / 100;
+  const discountAmount = Number(order.discountAmount || order.discount_amount || 0);
+  const grossTotal = Math.max(0, itemsTotal + parcelCharge - discountAmount);
+  const subtotal = Math.round((grossTotal / 1.05) * 100) / 100;
+  const gst = Math.round((grossTotal - subtotal) * 100) / 100;
   const cgst = Math.round((gst / 2) * 100) / 100;
   const sgst = Math.round((gst - cgst) * 100) / 100;
-  const total = Math.round(inclusiveTotal * 100) / 100;
-  const progressMap = { new: 20, preparing: 55, ready: 85, delivered: 100 };
+  const total = Math.round(grossTotal * 100) / 100;
+  const progressMap = { new: 20, preparing: 55, ready: 85, delivered: 100, cancelled: 100 };
   return {
     ...order,
     id: Number(order.id),
@@ -460,6 +461,9 @@ function enrichOrder(order) {
     total,
     itemsTotal,
     parcelCharge,
+    discountAmount,
+    pointsUsed: Number(order.pointsUsed || order.points_used || 0),
+    couponCode: order.couponCode || order.coupon_code || null,
     progress: progressMap[order.status] || 0,
     items: items.map((item) => ({
       id: Number(item.id || 0),
@@ -675,6 +679,67 @@ async function getOrders(restaurantId = null) {
   }));
 }
 
+async function getCouponByCode(code) {
+  if (!String(code || '').trim()) return null;
+  const { rows } = await pool.query(
+    `SELECT id, code, discount_type AS "discountType", discount_value AS "discountValue", min_spend AS "minSpend", max_discount AS "maxDiscount", active, expires_at AS "expiresAt" FROM coupon_codes WHERE lower(code) = lower($1) LIMIT 1`,
+    [String(code).trim()]
+  );
+  return rows[0] || null;
+}
+
+async function getCustomerPoints(customerMobile) {
+  if (!String(customerMobile || '').trim()) return { points: 0, updatedAt: null };
+  const { rows } = await pool.query(
+    `SELECT customer_mobile AS "customerMobile", points, updated_at AS "updatedAt" FROM customer_points WHERE customer_mobile = $1 LIMIT 1`,
+    [String(customerMobile).trim()]
+  );
+  return rows[0] ? { points: Number(rows[0].points || 0), updatedAt: Number(rows[0].updatedAt || 0) } : { points: 0, updatedAt: null };
+}
+
+async function upsertCustomerPoints(customerMobile, points) {
+  if (!String(customerMobile || '').trim()) return null;
+  const normalized = Math.max(0, Number(points) || 0);
+  const now = Date.now();
+  await pool.query(
+    `INSERT INTO customer_points (customer_mobile, points, updated_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (customer_mobile) DO UPDATE SET points = EXCLUDED.points, updated_at = EXCLUDED.updated_at`,
+    [String(customerMobile).trim(), normalized, now]
+  );
+  return getCustomerPoints(customerMobile);
+}
+
+async function applyCouponToAmount(code, amount) {
+  const coupon = await getCouponByCode(code);
+  if (!coupon || !coupon.active) return { valid: false, error: 'Coupon not found or inactive' };
+  if (coupon.expiresAt && Date.now() > Number(coupon.expiresAt || 0)) return { valid: false, error: 'Coupon has expired' };
+  if (Number(amount) < Number(coupon.minSpend || 0)) return { valid: false, error: `Minimum spend ₹${coupon.minSpend} required` };
+  let discount = 0;
+  if (String(coupon.discountType) === 'percent') {
+    discount = Math.round(Number(amount) * Number(coupon.discountValue || 0) / 100);
+    if (coupon.maxDiscount != null) discount = Math.min(discount, Number(coupon.maxDiscount));
+  } else {
+    discount = Number(coupon.discountValue || 0);
+  }
+  return { valid: true, discount: Math.max(0, discount), coupon };
+}
+
+async function updateOrderDiscounts(orderId, couponCode, pointsUsed, discountAmount) {
+  await pool.query(
+    `UPDATE orders SET coupon_code = $1, points_used = $2, discount_amount = $3, updated_at = $4 WHERE id = $5`,
+    [couponCode ? String(couponCode).trim() : null, Number(pointsUsed || 0), Number(discountAmount || 0), Date.now(), Number(orderId)]
+  );
+}
+
+async function getOrderDiscounts(orderId) {
+  const { rows } = await pool.query(
+    `SELECT coupon_code AS "couponCode", points_used AS "pointsUsed", discount_amount AS "discountAmount" FROM orders WHERE id = $1 LIMIT 1`,
+    [Number(orderId)]
+  );
+  return rows[0] || { couponCode: null, pointsUsed: 0, discountAmount: 0 };
+}
+
 async function getOrderById(orderId) {
   const params = [orderId];
   const { rows } = await pool.query(
@@ -697,6 +762,9 @@ async function getOrderById(orderId) {
        o.external_order_id AS "externalOrderId",
        o.customer_name AS "customerName",
        o.customer_mobile AS "customerMobile",
+       o.coupon_code AS "couponCode",
+       o.points_used AS "pointsUsed",
+       o.discount_amount AS "discountAmount",
        o.delivery_name AS "deliveryName",
        o.delivery_mobile AS "deliveryMobile",
        o.delivery_lat AS "deliveryLat",
@@ -725,9 +793,9 @@ async function getOrderById(orderId) {
 }
 
 function getStats(orders, tables) {
-  const activeOrders = orders.filter((order) => order.status !== 'delivered').length;
+  const activeOrders = orders.filter((order) => !['delivered', 'cancelled'].includes(String(order.status))).length;
   const now = Date.now();
-  const paidInProgressOrders = orders.filter((order) => Number(order.paid) === 1 && order.status !== 'delivered');
+  const paidInProgressOrders = orders.filter((order) => Number(order.paid) === 1 && !['delivered', 'cancelled'].includes(String(order.status)));
   const overdue = paidInProgressOrders.filter((order) => now - order.createdAt > order.etaMinutes * 60000).length;
   const waitingOrders = paidInProgressOrders;
   const avgWait = waitingOrders.length
@@ -736,7 +804,7 @@ function getStats(orders, tables) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const revenueToday = orders
-    .filter((order) => Number(order.paid) === 1 && order.createdAt >= todayStart.getTime())
+    .filter((order) => Number(order.paid) === 1 && order.status !== 'cancelled' && order.createdAt >= todayStart.getTime())
     .reduce((sum, order) => sum + Number(order.total || 0), 0);
   const occupiedTables = tables.filter((table) => table.status === 'occupied' || table.status === 'ordering').length;
 
@@ -833,7 +901,10 @@ async function createOrder({
   deliveryName = null,
   deliveryMobile = null,
   deliveryLat = null,
-  deliveryLng = null
+  deliveryLng = null,
+  couponCode = null,
+  pointsUsed = 0,
+  discountAmount = 0
 }) {
   const client = await pool.connect();
   try {
@@ -860,12 +931,12 @@ async function createOrder({
       `INSERT INTO orders (
          restaurant_id, order_type, table_number, notes, status, paid,
          eta_minutes, created_at, updated_at, payment_method, paid_at, source, external_order_id,
-         customer_name, customer_mobile,
+         customer_name, customer_mobile, coupon_code, points_used, discount_amount,
          delivery_name, delivery_mobile, delivery_lat, delivery_lng
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
        RETURNING id`,
-      [restaurantId, orderType, tableNumber, String(notes || ''), status, paid ? 1 : 0, etaMinutes, now, paymentMethod, paidAt, source, externalOrderId, customerName, customerMobile, deliveryName, deliveryMobile, deliveryLat, deliveryLng]
+      [restaurantId, orderType, tableNumber, String(notes || ''), status, paid ? 1 : 0, etaMinutes, now, paymentMethod, paidAt, source, externalOrderId, customerName, customerMobile, couponCode ? String(couponCode).trim() : null, Number(pointsUsed || 0), Number(discountAmount || 0), deliveryName, deliveryMobile, deliveryLat, deliveryLng]
     );
     const orderId = Number(created.rows[0].id);
 
@@ -906,12 +977,18 @@ async function createOrder({
   }
 }
 
+function calculateRewardPoints(amount) {
+  const total = Number(amount || 0);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  return Math.floor(total / 100) * 5;
+}
+
 async function markOrderPaid({ orderId, actor, paymentMethod, paymentGatewayOrderId = null, paymentGatewayPaymentId = null }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const orderResult = await client.query(
-      `SELECT id, restaurant_id AS "restaurantId", order_type AS "orderType", table_number AS "tableNumber", paid
+      `SELECT id, restaurant_id AS "restaurantId", order_type AS "orderType", table_number AS "tableNumber", paid, customer_mobile AS "customerMobile", total
        FROM orders
        WHERE id = $1
        FOR UPDATE`,
@@ -939,6 +1016,22 @@ async function markOrderPaid({ orderId, actor, paymentMethod, paymentGatewayOrde
           'UPDATE table_status SET status = $1 WHERE restaurant_id = $2 AND table_number = $3',
           ['occupied', Number(order.restaurantId), Number(order.tableNumber)]
         );
+      }
+
+      if (order.customerMobile) {
+        const pointsEarned = calculateRewardPoints(order.total);
+        if (pointsEarned > 0) {
+          const existing = await getCustomerPoints(order.customerMobile);
+          await upsertCustomerPoints(order.customerMobile, Number(existing.points || 0) + pointsEarned);
+          await logAudit(client, {
+            action: 'reward_points_awarded',
+            entityType: 'order',
+            entityId: orderId,
+            actor,
+            restaurantId: Number(order.restaurantId),
+            details: { customerMobile: order.customerMobile, pointsEarned, previousPoints: existing.points }
+          });
+        }
       }
 
       await logAudit(client, {
@@ -1130,11 +1223,39 @@ async function initDatabase() {
         source TEXT NOT NULL DEFAULT 'direct',
         external_order_id TEXT,
         customer_name TEXT,
-        customer_mobile TEXT
+        customer_mobile TEXT,
+        coupon_code TEXT,
+        points_used INTEGER NOT NULL DEFAULT 0,
+        discount_amount NUMERIC NOT NULL DEFAULT 0
       )
     `);
 
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS restaurant_id INTEGER`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_code TEXT`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS points_used INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC NOT NULL DEFAULT 0`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS coupon_codes (
+        id SERIAL PRIMARY KEY,
+        code TEXT UNIQUE NOT NULL,
+        discount_type TEXT NOT NULL DEFAULT 'flat',
+        discount_value NUMERIC NOT NULL DEFAULT 0,
+        min_spend INTEGER NOT NULL DEFAULT 0,
+        max_discount INTEGER,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        expires_at BIGINT,
+        created_at BIGINT NOT NULL
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customer_points (
+        customer_mobile TEXT PRIMARY KEY,
+        points INTEGER NOT NULL DEFAULT 0,
+        updated_at BIGINT NOT NULL
+      )
+    `);
 
     const defaultRestaurant = await client.query(`SELECT id FROM restaurants ORDER BY id ASC LIMIT 1`);
     const fallbackRestaurantId = Number(defaultRestaurant.rows[0]?.id || 0);
@@ -2379,7 +2500,21 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ error: 'This outlet is not accepting orders right now' });
     }
 
-    const { orderType, tableNumber, notes, items, customerName, customerMobile, deliveryName, deliveryMobile, deliveryLat, deliveryLng } = req.body || {};
+    const {
+      orderType,
+      tableNumber,
+      notes,
+      items,
+      customerName,
+      customerMobile,
+      deliveryName,
+      deliveryMobile,
+      deliveryLat,
+      deliveryLng,
+      couponCode,
+      pointsUsed,
+      discountAmount
+    } = req.body || {};
     if (!['dine', 'takeaway', 'preorder', 'delivery'].includes(orderType)) {
       return res.status(400).json({ error: 'Invalid order type' });
     }
@@ -2411,7 +2546,10 @@ app.post('/api/orders', async (req, res) => {
       deliveryName: deliveryName || null,
       deliveryMobile: deliveryMobile || null,
       deliveryLat: deliveryLat || null,
-      deliveryLng: deliveryLng || null
+      deliveryLng: deliveryLng || null,
+      couponCode: couponCode ? String(couponCode).trim() : null,
+      pointsUsed: Number(pointsUsed || 0),
+      discountAmount: Number(discountAmount || 0)
     });
 
     const createdOrder = (await getOrders(restaurantId)).find((order) => order.id === orderId);
@@ -2458,7 +2596,7 @@ app.delete('/api/management/admin/orders/:id', requireManagementAuth, requireAdm
 app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
   const orderId = Number(req.params.id);
   const status = String(req.body?.status || '').trim();
-  if (!['new', 'preparing', 'ready', 'delivered'].includes(status)) {
+  if (!['new', 'preparing', 'ready', 'delivered', 'cancelled'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
 
@@ -2488,7 +2626,7 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
       let nextTableStatus = null;
       if (status === 'new') nextTableStatus = 'ordering';
       if (status === 'preparing' || status === 'ready') nextTableStatus = 'occupied';
-      if (status === 'delivered') nextTableStatus = 'free';
+      if (status === 'delivered' || status === 'cancelled') nextTableStatus = 'free';
       if (nextTableStatus) {
         await client.query(
           'UPDATE table_status SET status = $1 WHERE restaurant_id = $2 AND table_number = $3',
@@ -2543,6 +2681,31 @@ app.get('/api/payments/razorpay/config', (_req, res) => {
   return res.json({ enabled: RAZORPAY_ENABLED, keyId: RAZORPAY_ENABLED ? RAZORPAY_KEY_ID : null });
 });
 
+app.post('/api/customer/points', async (req, res) => {
+  try {
+    const customerMobile = String(req.body?.customerMobile || '').trim();
+    if (!customerMobile) return res.status(400).json({ error: 'Customer mobile number is required' });
+    const points = await getCustomerPoints(customerMobile);
+    return res.json(points);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Unable to load customer points' });
+  }
+});
+
+app.post('/api/customer/coupon-preview', async (req, res) => {
+  try {
+    const couponCode = String(req.body?.couponCode || '').trim();
+    const amount = Number(req.body?.amount || 0);
+    if (!couponCode) return res.status(400).json({ error: 'Coupon code is required' });
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount for coupon preview' });
+    const result = await applyCouponToAmount(couponCode, amount);
+    if (!result.valid) return res.status(400).json({ error: result.error });
+    return res.json({ discount: Number(result.discount || 0), couponCode: couponCode, message: `Coupon will reduce ₹${Number(result.discount || 0)} from the bill` });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Unable to preview coupon' });
+  }
+});
+
 app.post('/api/orders/razorpay-order', async (req, res) => {
   try {
     if (!RAZORPAY_ENABLED || !razorpay) return res.status(400).json({ error: 'Razorpay is not configured' });
@@ -2550,8 +2713,11 @@ app.post('/api/orders/razorpay-order', async (req, res) => {
     const orderIds = normalizeOrderIds(req.body?.orderIds);
     if (!orderIds.length) return res.status(400).json({ error: 'No orders selected for payment' });
 
+    const couponCode = String(req.body?.couponCode || '').trim();
+    const pointsUsed = Math.max(0, Number(req.body?.pointsUsed || 0));
     const actor = getActor(req);
     const session = getManagementSession(req);
+
     const orders = [];
     for (const orderId of orderIds) {
       const order = await getOrderById(orderId);
@@ -2561,20 +2727,72 @@ app.post('/api/orders/razorpay-order', async (req, res) => {
     }
     if (!orders.length) return res.status(400).json({ error: 'All selected orders are already paid' });
 
+    let customerMobile = String(req.body?.customerMobile || req.query?.customerMobile || '').trim();
     if (session) {
       if (orders.some((order) => Number(order.restaurantId) !== Number(session.restaurantId))) {
         return res.status(403).json({ error: 'Not allowed' });
       }
+      customerMobile = String(orders[0].customerMobile || '').trim();
     } else {
-      const customerMobile = String(req.body?.customerMobile || req.query?.customerMobile || '').trim();
       if (!customerMobile || orders.some((order) => !order.customerMobile || String(order.customerMobile) !== customerMobile)) {
         return res.status(403).json({ error: 'Payment can only be initiated by the order owner' });
       }
     }
 
-    const amountPaise = Math.round(orders.reduce((sum, order) => sum + Number(order.total || 0), 0) * 100);
+    const rawAmount = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    let discount = 0;
+    if (couponCode) {
+      const couponResult = await applyCouponToAmount(couponCode, rawAmount);
+      if (!couponResult.valid) return res.status(400).json({ error: couponResult.error });
+      discount += Number(couponResult.discount || 0);
+    }
+
+    let pointsValue = 0;
+    if (pointsUsed > 0) {
+      const customerPoints = await getCustomerPoints(customerMobile);
+      if (pointsUsed > Number(customerPoints.points || 0)) {
+        return res.status(400).json({ error: 'Insufficient reward points' });
+      }
+      pointsValue = Number(pointsUsed) * 0.05;
+      discount += pointsValue;
+    }
+
+    const effectiveAmount = Math.max(0, rawAmount - discount);
+    const amountPaise = Math.round(effectiveAmount * 100);
     if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
-      return res.status(400).json({ error: 'Invalid order amount' });
+      return res.status(400).json({ error: 'Invalid order amount after discount' });
+    }
+
+    const orderAmountsPaise = orders.map((order) => Math.round(Number(order.total || 0) * 100));
+    const totalPaise = orderAmountsPaise.reduce((sum, value) => sum + value, 0) || 1;
+    let remainingDiscountPaise = Math.round(discount * 100);
+    const discountPaiseForOrders = orderAmountsPaise.map((orderPaise, index) => {
+      if (index === orderAmountsPaise.length - 1) {
+        const value = remainingDiscountPaise;
+        remainingDiscountPaise = 0;
+        return value;
+      }
+      const value = Math.min(Math.floor(orderPaise * Math.round(discount * 100) / totalPaise), remainingDiscountPaise);
+      remainingDiscountPaise -= value;
+      return value;
+    });
+
+    const pointsPaise = Math.round(pointsUsed * 5);
+    let remainingPointsPaise = pointsPaise;
+    const pointsAllocation = orderAmountsPaise.map((orderPaise, index) => {
+      if (index === orderAmountsPaise.length - 1) {
+        const value = remainingPointsPaise;
+        remainingPointsPaise = 0;
+        return value;
+      }
+      const value = Math.min(Math.round((pointsPaise * orderPaise) / totalPaise), remainingPointsPaise);
+      remainingPointsPaise -= value;
+      return value;
+    });
+
+    for (const [index, order] of orders.entries()) {
+      const orderPoints = Math.round((pointsAllocation[index] || 0) / 100);
+      await updateOrderDiscounts(order.id, couponCode || null, orderPoints, discountPaiseForOrders[index] / 100);
     }
 
     const gatewayOrder = await razorpay.orders.create({
@@ -2910,7 +3128,7 @@ app.post('/api/tables/:tableNumber/toggle', requireManagementAuth, async (req, r
     const active = await pool.query(
       `SELECT COUNT(*)::int AS count
        FROM orders
-       WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status != 'delivered'`,
+       WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status NOT IN ('delivered', 'cancelled')`,
       [req.management.restaurantId, tableNumber]
     );
     if (Number(active.rows[0].count) > 0) {
@@ -2954,7 +3172,7 @@ app.post('/api/tables/:tableNumber/status', requireManagementAuth, async (req, r
     const active = await pool.query(
       `SELECT COUNT(*)::int AS count
        FROM orders
-       WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status != 'delivered'`,
+       WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status NOT IN ('delivered', 'cancelled')`,
       [req.management.restaurantId, tableNumber]
     );
     if (Number(active.rows[0].count) > 0) {
@@ -3031,7 +3249,7 @@ app.delete('/api/tables/:tableNumber', requireManagementAuth, async (req, res) =
   const active = await pool.query(
     `SELECT COUNT(*)::int AS count
      FROM orders
-     WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status != 'delivered'`,
+     WHERE restaurant_id = $1 AND order_type IN ('dine', 'preorder') AND table_number = $2 AND status NOT IN ('delivered', 'cancelled')`,
     [req.management.restaurantId, tableNumber]
   );
   if (Number(active.rows[0].count) > 0) {
