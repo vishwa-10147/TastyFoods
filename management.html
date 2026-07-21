@@ -355,6 +355,7 @@
     .tag-preparing { background: var(--amber-l); color: var(--amber); }
     .tag-ready { background: var(--green-l); color: var(--green); }
     .tag-delivered { background: var(--bg4); color: var(--text3); }
+    .tag-cancelled { background: var(--red-l); color: var(--red); }
     .tag-dine { background: var(--blue-l); color: var(--blue); }
     .tag-takeaway { background: var(--amber-l); color: var(--amber); }
     .tag-preorder { background: var(--purple-l); color: var(--purple); }
@@ -422,7 +423,7 @@
     .print-note { font-size: 11px; color: var(--text3); }
 
     /* ── KITCHEN PIPELINE ───────────────────────────────── */
-    .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; height: calc(100dvh - 52px - 44px - 20px); }
+    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; height: calc(100dvh - 52px - 44px - 20px); }
     .pipeline-col {
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden;
@@ -438,6 +439,7 @@
     .pipeline-title.preparing { color: var(--amber); }
     .pipeline-title.ready { color: var(--green); }
     .pipeline-title.delivered { color: var(--text3); }
+    .pipeline-title.cancelled { color: var(--red); }
     .pipeline-count {
       font-family: var(--font-mono); font-size: 11px;
       color: var(--text3); background: var(--bg4);
@@ -466,6 +468,28 @@
     .kc-btn:hover { background: var(--fire); color: white; border-color: var(--fire); }
     .no-orders-msg { font-size: 12px; color: var(--text3); text-align: center; padding: 20px 0; }
     .kit-date-bar { padding: 10px 22px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .manual-type-tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 14px 16px 0;
+    }
+    .manual-type-tab {
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .manual-type-tab.active {
+      border-color: var(--fire);
+      background: var(--fire-l);
+      color: var(--fire);
+    }
 
     /* ── TRACKING ─────────────────────────────────────────── */
     .tracking-controls { padding: 10px 22px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
@@ -962,6 +986,7 @@
           <div class="metric-card"><div class="metric-accent green"></div><div class="metric-label">Delivered Today</div><div class="metric-value" id="m-tables">0</div><div class="metric-sub">Completed orders</div></div>
           <div class="metric-card"><div class="metric-accent amber"></div><div class="metric-label">Active Orders</div><div class="metric-value" id="m-wait">0</div><div class="metric-sub">Not yet delivered</div></div>
           <div class="metric-card"><div class="metric-accent blue"></div><div class="metric-label">Revenue</div><div class="metric-value" id="m-revenue">₹0</div><div class="metric-sub">Paid orders only</div></div>
+          <div class="metric-card"><div class="metric-accent fire"></div><div class="metric-label">Cancelled</div><div class="metric-value" id="m-cancelled">0</div><div class="metric-sub">Not counted in sales</div></div>
         </div>
 
         <!-- Date filter -->
@@ -1102,10 +1127,7 @@
                 <div class="menu-form-grid">
                   <input class="inp" id="manual-customer-name" placeholder="Customer name (optional)" />
                   <input class="inp" id="manual-customer-mobile" placeholder="Mobile (optional)" />
-                  <select class="inp" id="manual-order-type" onchange="renderManualOrder()">
-                    <option value="takeaway">Takeaway</option>
-                    <option value="dine">Dine-in</option>
-                  </select>
+                  <input type="hidden" id="manual-order-type" value="takeaway" />
                   <input class="inp" id="manual-table-number" type="number" min="1" placeholder="Table no. (optional)" />
                   <select class="inp" id="manual-payment-method">
                     <option value="cash">Cash</option>
@@ -1133,6 +1155,10 @@
           <div>
             <div class="card" style="position:sticky;top:22px;">
               <div class="card-head"><div class="card-title">Bill Preview</div></div>
+              <div class="manual-type-tabs">
+                <button class="manual-type-tab active" data-manual-type="takeaway" onclick="setManualOrderType('takeaway')">Takeaway</button>
+                <button class="manual-type-tab" data-manual-type="dine" onclick="setManualOrderType('dine')">Dine In</button>
+              </div>
               <div id="manual-order-preview"></div>
             </div>
           </div>
@@ -1168,6 +1194,10 @@
           <div class="pipeline-col">
             <div class="pipeline-head"><div class="pipeline-title delivered">Delivered</div><div class="pipeline-count" id="c-delivered">0</div></div>
             <div class="pipeline-body" id="l-delivered"></div>
+          </div>
+          <div class="pipeline-col">
+            <div class="pipeline-head"><div class="pipeline-title cancelled">Cancelled</div><div class="pipeline-count" id="c-cancelled">0</div></div>
+            <div class="pipeline-body" id="l-cancelled"></div>
           </div>
         </div>
       </div>
@@ -1309,7 +1339,7 @@
   const MGMT_TOKEN_KEY = 'mgmt_auth_token';
   const AUTO_PRINT_KEY = 'mgmt_auto_print';
   const ORDER_SOUND_KEY = 'mgmt_order_sound';
-  const PARCEL_CHARGE_AMOUNT = 5;
+  const PARCEL_CHARGE_AMOUNT = 10;
   let state = { menu: [], tables: [], orders: [], stats: {}, restaurant: null };
   let auditLogs = [];
   let managementAuth = null;
@@ -1684,7 +1714,9 @@
 
   // ── HELPERS ──────────────────────────────────────────────
   function getPaidOrders() { return (state.orders||[]).filter(o=>Number(o.paid)===1); }
+  function getSalesOrders() { return getPaidOrders().filter(o => o.status !== 'cancelled'); }
   function eta(o) {
+    if (o.status==='cancelled') return 'Cancelled';
     if (o.status==='delivered') return 'Delivered';
     const elapsed = Math.floor((Date.now()-o.createdAt)/60000);
     return `ETA ${Math.max(0,Number(o.etaMinutes||15)-elapsed)}m`;
@@ -1705,7 +1737,15 @@
   function clearKitchenDateFilter() { clearDate('kitchen-date-filter', renderKitchen); }
   function clearMenuOrdersDateFilter() { clearDate('menu-orders-date-filter', renderMenuOrders); }
 
+  function setManualOrderType(type) {
+    const value = String(type) === 'dine' ? 'dine' : 'takeaway';
+    const input = document.getElementById('manual-order-type');
+    if (input) input.value = value;
+    renderManualOrder();
+  }
+
   function typeBadge(o) {
+    if (o.status === 'cancelled') return '<span class="tag tag-cancelled">Cancelled</span>';
     const t = o.orderType||'dine';
     const labels = {dine:`Table ${o.tableNumber||'-'}`,takeaway:'Takeaway',preorder:'Pre-order',delivery:'🏍️ Delivery'};
     const cls = {dine:'tag-dine',takeaway:'tag-takeaway',preorder:'tag-preorder',delivery:'tag-delivery'};
@@ -1713,6 +1753,7 @@
   }
 
   function nextStatus(st) {
+    if (st==='cancelled') return 'cancelled';
     if (st==='new') return 'preparing';
     if (st==='preparing') return 'ready';
     if (st==='ready') return 'delivered';
@@ -1788,17 +1829,20 @@
   function renderDashboard() {
     const selectedDate = getSelectedDate('dashboard-date-filter');
     const paidOrders = getPaidOrders().filter(o => !selectedDate || orderDateKey(o)===selectedDate);
-    const active = paidOrders.filter(o=>o.status!=='delivered').length;
-    const delivered = paidOrders.filter(o=>o.status==='delivered').length;
-    const overdue = paidOrders.filter(o=>o.status!=='delivered'&&(Date.now()-Number(o.createdAt||0))>(Number(o.etaMinutes||0)*60000)).length;
-    const revenue = paidOrders.reduce((s,o)=>s+Number(o.total||0),0);
+    const salesOrders = getSalesOrders().filter(o => !selectedDate || orderDateKey(o)===selectedDate);
+    const active = salesOrders.filter(o=>o.status!=='delivered').length;
+    const delivered = salesOrders.filter(o=>o.status==='delivered').length;
+    const cancelled = paidOrders.filter(o=>o.status==='cancelled').length;
+    const overdue = salesOrders.filter(o=>o.status!=='delivered'&&(Date.now()-Number(o.createdAt||0))>(Number(o.etaMinutes||0)*60000)).length;
+    const revenue = salesOrders.reduce((s,o)=>s+Number(o.total||0),0);
     const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
     setText('m-active', overdue);
     setText('m-overdue', `${active} active`);
     setText('m-tables', delivered);
     setText('m-wait', active);
     setText('m-revenue', money(revenue));
-    setText('k-badge', paidOrders.filter(o=>o.status==='new').length);
+    setText('m-cancelled', cancelled);
+    setText('k-badge', salesOrders.filter(o=>o.status==='new').length);
 
     const recent = paidOrders.slice(0,5);
     const recentEl = document.getElementById('recent');
@@ -1812,7 +1856,10 @@
         <div class="order-items">${(o.items||[]).map(i=>`${esc(i.name)} ×${i.qty}`).join(' · ')}</div>
         <div class="order-foot">
           <div class="order-amount">${money(o.total)}</div>
-          <div class="order-eta">${eta(o)}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            <div class="order-eta">${eta(o)}</div>
+            ${o.status !== 'cancelled' ? `<button class="btn-danger" onclick="cancelOrder(${Number(o.id)})">Cancel</button>` : ''}
+          </div>
         </div>
       </div>
     `).join('') : '<div style="font-size:13px;color:var(--text3);">No orders yet.</div>';
@@ -1877,8 +1924,9 @@
     el.innerHTML = restaurants.map((restaurant) => {
       const restaurantOrders = orders.filter((order) => Number(order.restaurantId) === Number(restaurant.id));
       const paidOrders = restaurantOrders.filter((order) => Number(order.paid) === 1);
-      const active = paidOrders.filter((order) => order.status !== 'delivered').length;
-      const revenue = paidOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+      const salesOrders = paidOrders.filter((order) => order.status !== 'cancelled');
+      const active = salesOrders.filter((order) => order.status !== 'delivered').length;
+      const revenue = salesOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
       return `
         <div class="order-card">
           <div class="order-card-head">
@@ -2142,6 +2190,7 @@
 
     const lines = getManualDraftLines();
     const orderType = document.getElementById('manual-order-type')?.value || 'takeaway';
+    document.querySelectorAll('.manual-type-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.manualType === orderType));
     const itemsTotal = lines.reduce((sum, line) => sum + Number(line.item.price || 0) * line.qty, 0);
     const parcelCharge = lines.length && orderType === 'takeaway' ? PARCEL_CHARGE_AMOUNT : 0;
     const inclusiveTotal = itemsTotal + parcelCharge;
@@ -2376,14 +2425,14 @@
       if (!selectedDate) return true;
       return orderDateKey(o) === selectedDate;
     });
-    const groups = { new:[], preparing:[], ready:[], delivered:[] };
+    const groups = { new:[], preparing:[], ready:[], delivered:[], cancelled:[] };
     paidOrders.forEach(o => (groups[o.status]||groups.new).push(o));
-    ['new','preparing','ready','delivered'].forEach(st=>{
+    ['new','preparing','ready','delivered','cancelled'].forEach(st=>{
       document.getElementById(`c-${st}`).textContent = groups[st].length;
       const el = document.getElementById(`l-${st}`);
       if (!groups[st].length) { el.innerHTML=`<div class="no-orders-msg">No orders</div>`; return; }
       el.innerHTML = groups[st].map(o=>`
-        <div class="kitchen-card" style="${st==='delivered'?'opacity:0.55':''}">
+        <div class="kitchen-card" style="${['delivered','cancelled'].includes(st)?'opacity:0.55':''}">
           <div class="kc-head">
             <div class="kc-id">${esc(o.label)}</div>
             <div style="display:flex;gap:4px;">${typeBadge(o)}</div>
@@ -2401,13 +2450,13 @@
     const selectedDate = getSelectedDate('kitchen-date-filter');
     const deliveryOnlyCheckbox = document.getElementById('kitchen-delivery-only');
     const deliveryOnly = deliveryOnlyCheckbox ? deliveryOnlyCheckbox.checked : false;
-    const groups = { new: [], preparing: [], ready: [], delivered: [] };
+    const groups = { new: [], preparing: [], ready: [], delivered: [], cancelled: [] };
     getPaidOrders().forEach((order) => {
       if (deliveryOnly && order.orderType !== 'delivery') return;
       if (selectedDate && orderDateKey(order) !== selectedDate) return;
       (groups[order.status] || groups.new).push(order);
     });
-    ['new', 'preparing', 'ready', 'delivered'].forEach((status) => {
+    ['new', 'preparing', 'ready', 'delivered', 'cancelled'].forEach((status) => {
       const list = document.getElementById(`l-${status}`);
       if (!list) return;
       const cards = Array.from(list.querySelectorAll('.kitchen-card'));
