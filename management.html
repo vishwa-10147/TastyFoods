@@ -2496,8 +2496,9 @@
 
   async function changeStatus(id, status) {
     try {
-      await api(`/api/orders/${id}/status`,'POST',{status});
+      const result = await api(`/api/orders/${id}/status`,'POST',{status});
       await fetchState();
+      return result;
     } catch(e) { alert(e.message); }
   }
 
@@ -2508,8 +2509,12 @@
       alert('Completed or cancelled orders cannot be cancelled.');
       return;
     }
-    if (!confirm(`Cancel order ${order.label || `#${id}`}?`)) return;
-    await changeStatus(id, 'cancelled');
+    const refundNote = Number(order.paid) === 1 && order.paymentGatewayPaymentId
+      ? ` A Razorpay refund for ${money(order.total)} will be started.`
+      : '';
+    if (!confirm(`Cancel order ${order.label || `#${id}`}?${refundNote}`)) return;
+    const result = await changeStatus(id, 'cancelled');
+    if (result?.refund) alert(`Refund ${result.refund.status}: ${money(result.refund.amount)}.`);
   }
 
   // ── TRACKING ─────────────────────────────────────────────

@@ -627,6 +627,10 @@ async function getOrders(restaurantId = null) {
        o.paid_at AS "paidAt",
        o.payment_gateway_order_id AS "paymentGatewayOrderId",
        o.payment_gateway_payment_id AS "paymentGatewayPaymentId",
+       o.payment_gateway_refund_id AS "paymentGatewayRefundId",
+       o.refund_amount AS "refundAmount",
+       o.refund_status AS "refundStatus",
+       o.refunded_at AS "refundedAt",
        o.source,
        o.external_order_id AS "externalOrderId",
        r.code AS "restaurantCode",
@@ -754,11 +758,15 @@ async function getOrderById(orderId) {
        o.eta_minutes AS "etaMinutes",
        o.created_at AS "createdAt",
        o.updated_at AS "updatedAt",
-       o.payment_method AS "paymentMethod",
-       o.paid_at AS "paidAt",
-       o.payment_gateway_order_id AS "paymentGatewayOrderId",
-       o.payment_gateway_payment_id AS "paymentGatewayPaymentId",
-       o.source,
+        o.payment_method AS "paymentMethod",
+        o.paid_at AS "paidAt",
+        o.payment_gateway_order_id AS "paymentGatewayOrderId",
+        o.payment_gateway_payment_id AS "paymentGatewayPaymentId",
+        o.payment_gateway_refund_id AS "paymentGatewayRefundId",
+        o.refund_amount AS "refundAmount",
+        o.refund_status AS "refundStatus",
+        o.refunded_at AS "refundedAt",
+        o.source,
        o.external_order_id AS "externalOrderId",
        o.customer_name AS "customerName",
        o.customer_mobile AS "customerMobile",
@@ -1220,6 +1228,10 @@ async function initDatabase() {
         paid_at BIGINT,
         payment_gateway_order_id TEXT,
         payment_gateway_payment_id TEXT,
+        payment_gateway_refund_id TEXT,
+        refund_amount NUMERIC NOT NULL DEFAULT 0,
+        refund_status TEXT,
+        refunded_at BIGINT,
         source TEXT NOT NULL DEFAULT 'direct',
         external_order_id TEXT,
         customer_name TEXT,
@@ -1234,6 +1246,10 @@ async function initDatabase() {
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_code TEXT`);
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS points_used INTEGER NOT NULL DEFAULT 0`);
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_gateway_refund_id TEXT`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_amount NUMERIC NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_status TEXT`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at BIGINT`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS coupon_codes (
@@ -2605,7 +2621,13 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
   try {
     await client.query('BEGIN');
     const result = await client.query(
-      `SELECT id, order_type AS "orderType", table_number AS "tableNumber", status
+      `SELECT id,
+              order_type AS "orderType",
+              table_number AS "tableNumber",
+              status,
+              paid,
+              payment_gateway_payment_id AS "paymentGatewayPaymentId",
+              payment_gateway_refund_id AS "paymentGatewayRefundId"
        FROM orders
        WHERE id = $1 AND restaurant_id = $2
        FOR UPDATE`,
@@ -2621,9 +2643,60 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
       return res.status(400).json({ error: 'Completed or cancelled orders cannot be cancelled' });
     }
 
+    let refund = null;
+    if (status === 'cancelled' && Number(order.paid) === 1 && order.paymentGatewayPaymentId) {
+      if (!RAZORPAY_ENABLED || !razorpay) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Razorpay is not configured, so this paid order cannot be refunded automatically' });
+      }
+      if (order.paymentGatewayRefundId) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'A refund has already been started for this order' });
+      }
+
+      const orderToRefund = await getOrderById(orderId);
+      const amountPaise = Math.round(Number(orderToRefund?.total || 0) * 100);
+      if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Unable to determine the refund amount' });
+      }
+
+      try {
+        refund = await razorpay.payments.refund(order.paymentGatewayPaymentId, {
+          amount: amountPaise,
+          speed: 'normal',
+          receipt: `cancel_${orderId}_${Date.now()}`,
+          notes: { app_order_id: String(orderId), reason: 'order_cancelled' }
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: getGatewayErrorMessage(error, 'Razorpay refund could not be created; the order was not cancelled') });
+      }
+      if (String(refund?.status || '').toLowerCase() === 'failed') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Razorpay could not process the refund; the order was not cancelled' });
+      }
+    }
+
     await client.query(
-      'UPDATE orders SET status = $1, updated_at = $2 WHERE id = $3 AND restaurant_id = $4',
-      [status, Date.now(), orderId, req.management.restaurantId]
+      `UPDATE orders
+       SET status = $1,
+           updated_at = $2,
+           payment_gateway_refund_id = COALESCE($3, payment_gateway_refund_id),
+           refund_amount = CASE WHEN $4 IS NULL THEN refund_amount ELSE $4 END,
+           refund_status = COALESCE($5, refund_status),
+           refunded_at = CASE WHEN $6 IS NULL THEN refunded_at ELSE $6 END
+       WHERE id = $7 AND restaurant_id = $8`,
+      [
+        status,
+        Date.now(),
+        refund?.id || null,
+        refund ? Number(refund.amount || 0) / 100 : null,
+        refund?.status || null,
+        refund ? Date.now() : null,
+        orderId,
+        req.management.restaurantId
+      ]
     );
 
     if ((order.orderType === 'dine' || order.orderType === 'preorder') && order.tableNumber) {
@@ -2645,7 +2718,15 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
       entityId: orderId,
       actor,
       restaurantId: req.management.restaurantId,
-      details: { from: order.status, to: status, orderType: order.orderType, tableNumber: order.tableNumber }
+      details: {
+        from: order.status,
+        to: status,
+        orderType: order.orderType,
+        tableNumber: order.tableNumber,
+        refundId: refund?.id || null,
+        refundAmount: refund ? Number(refund.amount || 0) / 100 : 0,
+        refundStatus: refund?.status || null
+      }
     });
 
     await client.query('COMMIT');
@@ -2672,7 +2753,7 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
       });
     }
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, refund: refund ? { id: refund.id, amount: Number(refund.amount || 0) / 100, status: refund.status } : null });
   } catch (error) {
     await client.query('ROLLBACK');
     return res.status(400).json({ error: error.message || 'Unable to update order status' });

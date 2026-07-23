@@ -1199,7 +1199,7 @@
               <div class="otype-label">Order Type</div>
               <div class="otype-tabs">
                 <div class="otype-tab active" onclick="setOrderType(this,'dine')">🪑 Dine-in</div>
-                <div class="otype-tab" onclick="setOrderType(this,'takeaway')">🥡 Takeaway (+₹10)</div>
+                <div class="otype-tab" onclick="setOrderType(this,'takeaway')">🥡 Takeaway</div>
               </div>
             </div>
 
@@ -2487,11 +2487,19 @@
     const o = orders.find(x => x.id === selectedTrackingOrderId);
     const elapsed = Math.floor((Date.now() - o.createdAt) / 60000);
     const eta = o.status === 'delivered' ? 0 : Math.max(0, (o.etaMinutes||15) - elapsed);
+    const orderProgress = o.status === 'cancelled'
+      ? 'Order cancelled'
+      : o.status === 'delivered'
+        ? 'Delivered 🎉'
+        : `ETA ~${eta} min`;
+    const refundInfo = o.refundStatus
+      ? ` · Refund ${esc(o.refundStatus)}${Number(o.refundAmount || 0) > 0 ? ` (${money(o.refundAmount)})` : ''}`
+      : '';
     card.innerHTML = `
       ${receiptMarkup(o)}
       <div class="progress-wrap" style="max-width:560px;">
         <div class="progress-bar"><div class="progress-fill" style="width:${o.progress||0}%"></div></div>
-        <div class="progress-info">${o.progress||0}% complete · ${o.status === 'delivered' ? 'Delivered 🎉' : `ETA ~${eta} min`} · ${o.paid ? 'Paid' : 'Payment pending'}</div>
+        <div class="progress-info">${o.progress||0}% complete · ${orderProgress} · ${o.paid ? 'Paid' : 'Payment pending'}${refundInfo}</div>
       </div>
       ${PAYMENT_TEST_MODE || o.paid ? '' : `<div style="max-width:560px;"><button class="retry-btn" onclick="openRetryPayment(${Number(o.id)})">Continue Payment →</button></div>`}
     `;
