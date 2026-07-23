@@ -196,28 +196,51 @@
     }
     .mobile-restaurant-panel .restaurant-card {
       width: 100%;
-      background: var(--white);
-      border-color: var(--border);
-      box-shadow: 0 8px 24px rgba(26,19,16,0.08);
+      background: #fff;
+      border: 1px solid rgba(216, 90, 48, 0.18);
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(216, 90, 48, 0.08);
+      color: #d85a30;
     }
     .mobile-restaurant-panel .restaurant-card.active {
-      border-color: var(--clay);
-      background: var(--clay-l);
-      box-shadow: 0 10px 28px rgba(232,96,58,0.16);
+      border-color: rgba(216, 90, 48, 0.35);
+      background: #fff8f2;
+      box-shadow: 0 10px 28px rgba(216, 90, 48, 0.16);
     }
-    .mobile-restaurant-panel .restaurant-name { color: var(--ink); }
-    .mobile-restaurant-panel .restaurant-meta { color: var(--ink-l); }
+    .mobile-restaurant-panel .restaurant-name { color: #d85a30; }
+    .mobile-restaurant-panel .restaurant-meta { color: rgba(216, 90, 48, 0.85); }
     .mobile-restaurant-panel .restaurant-badge {
-      background: var(--paper);
-      color: var(--ink-m);
+      background: rgba(216, 90, 48, 0.08);
+      color: #d85a30;
     }
     .mobile-restaurant-panel .restaurant-badge.open {
-      background: var(--sage-l);
-      color: var(--sage);
+      background: rgba(216, 90, 48, 0.12);
+      color: #d85a30;
     }
     .mobile-restaurant-panel .restaurant-badge.closed {
-      background: #fef2f2;
-      color: #dc2626;
+      background: rgba(216, 90, 48, 0.08);
+      color: #d85a30;
+    }
+    .expand-restaurants-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 14px;
+      background: #d85a30;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 8px 22px rgba(216, 90, 48, 0.18);
+    }
+    .expand-restaurants-btn:hover {
+      background: #c64d24;
+      transform: translateY(-1px);
+    }
+    .mobile-restaurant-panel.expanded .restaurant-list {
+      max-height: none;
     }
 
     /* ── MAIN ─────────────────────────────────────────── */
@@ -835,6 +858,30 @@
       cursor: pointer; transition: all 0.2s;
       font-family: 'DM Sans', sans-serif;
     }
+    .payment-field-row {
+      display: grid; gap: 8px; margin-bottom: 16px;
+    }
+    .payment-action-row {
+      display: grid; grid-template-columns: 1fr auto; gap: 10px;
+      align-items: center;
+    }
+    .apply-btn {
+      padding: 12px 14px; background: var(--clay); color: white;
+      border: none; border-radius: 12px; cursor: pointer;
+      font-size: 13px; font-weight: 700;
+    }
+    .apply-btn.secondary {
+      background: #f7f7f7; color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    .helper-text {
+      font-size: 12px; color: var(--ink-l); line-height: 1.4;
+    }
+    .payment-summary-note {
+      font-size: 13px; color: var(--clay-d); font-weight: 600;
+      margin-bottom: 16px;
+      min-height: 22px;
+    }
     .pay-method:hover { border-color: var(--clay-m); color: var(--clay-d); }
     .pay-method.active { border-color: var(--clay); background: var(--clay-l); color: var(--clay-d); }
     .pay-method:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -975,9 +1022,36 @@
       .page-title { font-size: 24px; }
       .section-inner { padding: 10px 14px 92px; }
       .resto-hero { display: none; }
-      .customer-card { padding: 12px; margin-bottom: 16px; }
-      .customer-card .card-title { display: none; }
+      .customer-card {
+        padding: 12px;
+        margin-bottom: 16px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.98);
+      }
+      .customer-card .card-title {
+        display: none;
+      }
+      .field-group {
+        gap: 8px;
+      }
+      .field-lbl {
+        font-size: 11px;
+        color: rgba(26,19,16,0.7);
+      }
+      .field-inp {
+        font-size: 15px;
+        padding: 12px 14px;
+      }
       .otype-label { margin-bottom: 8px; }
+      .restaurant-list-title { color: #d85a30; }
+      .mobile-restaurant-panel {
+        padding: 10px 12px 14px;
+        background: #fff;
+        border-bottom: 1px solid rgba(216, 90, 48, 0.12);
+      }
+      .mobile-restaurant-panel .restaurant-list {
+        gap: 12px;
+      }
       .otype-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .otype-tab { font-size: 14px; padding: 13px 8px; }
       .menu-search-wrap { margin-bottom: 12px; }
@@ -1081,6 +1155,7 @@
     <div class="mobile-restaurant-panel">
       <div class="restaurant-list-title">Choose Restaurant</div>
       <div id="mobile-restaurant-list" class="restaurant-list"></div>
+      <button id="expand-restaurants-btn" class="expand-restaurants-btn" type="button">Show all restaurants</button>
     </div>
 
     <!-- ORDER VIEW -->
@@ -1228,6 +1303,23 @@
         <div class="pay-layout">
           <div class="pay-card">
             <div class="pay-title">Payment</div>
+            <div class="payment-field-row">
+              <label class="field-lbl">Coupon code</label>
+              <div class="payment-action-row">
+                <input class="field-inp" id="coupon-code" type="text" placeholder="Enter coupon code" oninput="clearCouponPreview()" />
+                <button class="apply-btn" type="button" onclick="applyCouponCode()">Apply</button>
+              </div>
+              <div class="helper-text" id="coupon-helper">Enter a coupon to save on your bill.</div>
+            </div>
+            <div class="payment-field-row">
+              <label class="field-lbl">Reward points</label>
+              <div class="payment-action-row">
+                <input class="field-inp" id="points-used" type="number" min="0" step="1" placeholder="Points to spend" oninput="updatePointsToUse(this.value)" />
+                <button class="apply-btn secondary" type="button" onclick="refreshCustomerPoints()">Refresh</button>
+              </div>
+              <div class="helper-text" id="points-helper">Refresh after entering mobile.</div>
+            </div>
+            <div class="payment-summary-note" id="discount-summary"></div>
             <div class="pay-methods">
               <button class="pay-method pay-method-pay active" id="pay-btn" onclick="payOrder()">💳 Pay with Card / UPI</button>
             </div>
@@ -1297,6 +1389,8 @@
   let isCustomDomain = false;
   let cart = [];
   let currentCat = 'all';
+  let mobileRestaurantsExpanded = false;
+
   let orderType = 'dine';
   let selectedTrackingOrderId = null;
   let pendingPaymentOrderId = null;
@@ -1305,7 +1399,11 @@
   let selectedPaymentMethod = 'card';
   let razorpayConfig = { enabled: false, keyId: null };
   let currentCartTotal = 0;
-  const PARCEL_CHARGE_AMOUNT = 5;
+  let customerPointsBalance = 0;
+  let lastCustomerPointsMobile = '';
+  let couponPreview = { code: '', discount: 0, valid: false, message: '' };
+  let pointsToUse = 0;
+  const PARCEL_CHARGE_AMOUNT = 10;
   let deliveryUnlockedShown = false;
   let deliveryLocation = { lat: null, lng: null };
   let clientOrderIds = new Set();
@@ -1724,18 +1822,21 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function renderRestaurantSidebar() {
-    const containers = [
-      document.getElementById('restaurant-list'),
-      document.getElementById('mobile-restaurant-list')
-    ].filter(Boolean);
-    if (!containers.length) return;
+    const desktopContainer = document.getElementById('restaurant-list');
+    const mobileContainer = document.getElementById('mobile-restaurant-list');
+    const expandBtn = document.getElementById('expand-restaurants-btn');
+    const mobilePanel = document.querySelector('.mobile-restaurant-panel');
+    if (!desktopContainer && !mobileContainer) return;
     if (!restaurants.length) {
-      containers.forEach((container) => {
-        container.innerHTML = `<div class="restaurant-card"><div class="restaurant-name">No restaurants registered</div><div class="restaurant-meta">Register a restaurant from the management panel and it will appear here automatically.</div></div>`;
-      });
+      const emptyHtml = `<div class="restaurant-card"><div class="restaurant-name">No restaurants registered</div><div class="restaurant-meta">Register a restaurant from the management panel and it will appear here automatically.</div></div>`;
+      if (desktopContainer) desktopContainer.innerHTML = emptyHtml;
+      if (mobileContainer) mobileContainer.innerHTML = emptyHtml;
+      if (expandBtn) expandBtn.style.display = 'none';
+      if (mobilePanel) mobilePanel.classList.remove('expanded');
       return;
     }
-    const html = restaurants.map((r) => {
+
+    const restaurantHtml = (r) => {
       const active = String(r.code) === String(selectedRestaurantCode);
       const statusClass = r.acceptingOrders ? 'open' : 'closed';
       const rating = Number.isFinite(Number(r.rating)) ? `${Number(r.rating).toFixed(1)} ⭐` : String(r.rating || '4.0 ⭐');
@@ -1749,10 +1850,32 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
           </div>
         </div>
       `;
-    }).join('');
-    containers.forEach((container) => {
-      container.innerHTML = html;
-    });
+    };
+
+    if (desktopContainer) desktopContainer.innerHTML = restaurants.map(restaurantHtml).join('');
+
+    if (mobileContainer) {
+      const visibleCount = mobileRestaurantsExpanded ? restaurants.length : Math.min(5, restaurants.length);
+      mobileContainer.innerHTML = restaurants.slice(0, visibleCount).map(restaurantHtml).join('');
+    }
+
+    if (expandBtn) {
+      if (restaurants.length <= 5) {
+        expandBtn.style.display = 'none';
+      } else {
+        expandBtn.style.display = 'block';
+        expandBtn.textContent = mobileRestaurantsExpanded ? 'Show fewer restaurants' : `Show all restaurants (${restaurants.length})`;
+      }
+    }
+
+    if (mobilePanel) {
+      mobilePanel.classList.toggle('expanded', mobileRestaurantsExpanded);
+    }
+  }
+
+  function toggleMobileRestaurantList() {
+    mobileRestaurantsExpanded = !mobileRestaurantsExpanded;
+    renderRestaurantSidebar();
   }
 
   async function selectRestaurant(code) {
@@ -2393,18 +2516,94 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     return unpaid;
   }
 
-  function buildCurrentCartSummaryGroups() {
-    if (!pendingCartSnapshot?.items?.length) return [];
-    const grouped = new Map();
-    pendingCartSnapshot.items.forEach((item) => {
-      const restaurantKey = String(item.restaurantCode || selectedRestaurantCode || '');
-      const restaurantName = String(item.restaurantName || getRestaurantNameById(restaurantKey) || 'Restaurant');
-      const entry = grouped.get(restaurantKey) || { restaurantKey, restaurantName, total: 0, items: [] };
-      entry.items.push({ menuItemId: Number(item.menuItemId), name: String(item.name || ''), qty: Number(item.qty || 0), price: Number(item.price || 0) });
-      entry.total += Number(item.price || 0) * Number(item.qty || 0);
-      grouped.set(restaurantKey, entry);
-    });
-    return Array.from(grouped.values());
+  function updateCouponSummary() {
+    const summary = document.getElementById('discount-summary');
+    if (!summary) return;
+    const parts = [];
+    if (couponPreview.code) {
+      if (couponPreview.valid) {
+        parts.push(`Coupon ${esc(couponPreview.code)} applied: -${money(couponPreview.discount)}`);
+      } else {
+        parts.push(`Coupon invalid: ${esc(couponPreview.message)}`);
+      }
+    }
+    if (pointsToUse > 0) {
+      const pointsRupeeValue = pointsToUse * 0.05;
+      parts.push(`Points to spend: ${pointsToUse} (₹${money(pointsRupeeValue)})`);
+    }
+    if (parts.length) {
+      summary.textContent = parts.join(' · ');
+      summary.style.display = 'block';
+    } else {
+      summary.textContent = '';
+      summary.style.display = 'none';
+    }
+  }
+
+  async function refreshCustomerPoints() {
+    const mobile = String(document.getElementById('customer-mobile')?.value || '').trim();
+    if (!mobile) {
+      showWarn('Enter mobile number to refresh points.');
+      return;
+    }
+    try {
+      const resp = await api('/api/customer/points', 'POST', { customerMobile: mobile });
+      customerPointsBalance = Number(resp.points || 0);
+      lastCustomerPointsMobile = mobile;
+      const helper = document.getElementById('points-helper');
+      if (helper) helper.textContent = `You have ${customerPointsBalance} points. 100 points = ₹5.`;
+      if (pointsToUse > customerPointsBalance) {
+        pointsToUse = customerPointsBalance;
+        const pointsIn = document.getElementById('points-used');
+        if (pointsIn) pointsIn.value = String(pointsToUse);
+      }
+      updateCouponSummary();
+    } catch (error) {
+      showWarn(error.message || 'Unable to load reward points');
+    }
+  }
+
+  function updatePointsToUse(value) {
+    pointsToUse = Math.max(0, Number(value || 0));
+    if (customerPointsBalance && pointsToUse > customerPointsBalance) pointsToUse = customerPointsBalance;
+    const pointsIn = document.getElementById('points-used');
+    if (pointsIn) pointsIn.value = String(pointsToUse);
+    updateCouponSummary();
+  }
+
+  function clearCouponPreview() {
+    couponPreview = { code: '', discount: 0, valid: false, message: '' };
+    updateCouponSummary();
+  }
+
+  async function applyCouponCode() {
+    const code = String(document.getElementById('coupon-code')?.value || '').trim();
+    couponPreview = { code, discount: 0, valid: false, message: '' };
+    if (!code) {
+      showWarn('Enter a coupon code first.');
+      updateCouponSummary();
+      return;
+    }
+    const orders = payableOrders();
+    const amount = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    if (!orders.length || amount <= 0) {
+      showWarn('No pending orders available for coupon application.');
+      return;
+    }
+    try {
+      const resp = await api('/api/customer/coupon-preview', 'POST', { couponCode: code, amount });
+      couponPreview = { code, discount: Number(resp.discount || 0), valid: true, message: resp.message || '' };
+      updateCouponSummary();
+      showWarn(`Coupon applied: -${money(couponPreview.discount)}`);
+    } catch (error) {
+      couponPreview = { code, discount: 0, valid: false, message: error.message || 'Invalid coupon' };
+      updateCouponSummary();
+    }
+  }
+
+  function getPaymentDiscount() {
+    const pointsRupeeValue = Number(pointsToUse || 0) * 0.05;
+    return Number(couponPreview.valid ? couponPreview.discount : 0) + pointsRupeeValue;
   }
 
   function buildPreviousOrderSummaryGroups(orders) {
@@ -2479,12 +2678,16 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     const currentGroups = buildCurrentCartSummaryGroups();
     const previousGroups = buildPreviousOrderSummaryGroups(previousOrders);
     const total = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const discount = getPaymentDiscount();
+    const finalTotal = Math.max(0, total - discount);
     const restaurantCount = new Set(orders.map((order) => String(order.restaurantCode || order.restaurantId || ''))).size;
     return `
       <div style="display:grid;gap:12px;">
         <div style="padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--clay-l);">
           <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--clay-d);margin-bottom:6px;">Grand Total</div>
           <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:800;color:var(--ink);">${money(total)}</div>
+          ${discount > 0 ? `<div style="margin-top:8px;font-size:14px;color:${discount === pointsToUse + (couponPreview.valid ? couponPreview.discount : 0) ? 'var(--clay-d)' : 'var(--ink-l)'};">Discounts: -${money(discount)}</div>` : ''}
+          ${discount > 0 ? `<div style="margin-top:4px;font-size:18px;font-weight:700;color:var(--ink);">Payable: ${money(finalTotal)}</div>` : ''}
           <div style="font-size:13px;color:var(--ink-m);margin-top:4px;">${orders.length} order${orders.length > 1 ? 's' : ''} across ${restaurantCount} restaurant${restaurantCount > 1 ? 's' : ''}</div>
         </div>
         ${currentGroups.length ? groupedOrderSummaryMarkup(currentGroups, 'Current cart', true, 'current') : ''}
@@ -2517,8 +2720,10 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     if (!orderIds.length) { alert('No pending orders found.'); return; }
     try {
       const customerMobile = String(document.getElementById('customer-mobile')?.value || '').trim();
+      const couponCode = String(document.getElementById('coupon-code')?.value || '').trim();
+      const pointsUsed = Math.max(0, Number(document.getElementById('points-used')?.value || 0));
       if (!razorpayConfig.enabled || !razorpayConfig.keyId) { alert('Payment not configured. Please configure Razorpay.'); return; }
-      const gateway = await api('/api/orders/razorpay-order', 'POST', { orderIds, paymentMethod: selectedPaymentMethod, customerMobile });
+      const gateway = await api('/api/orders/razorpay-order', 'POST', { orderIds, paymentMethod: selectedPaymentMethod, customerMobile, couponCode, pointsUsed });
       const rzp = new Razorpay({
         key: gateway.keyId, amount: gateway.amountPaise,
         currency: gateway.currency || 'INR', name: 'Tasty Food',
@@ -2675,6 +2880,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
 
     restoreDraft();
     renderAll();
+
+    const expandBtn = document.getElementById('expand-restaurants-btn');
+    if (expandBtn) expandBtn.addEventListener('click', toggleMobileRestaurantList);
 
     // Handle initial hash
     const hash = String(window.location.hash || '').replace(/^#/, '').toLowerCase();
