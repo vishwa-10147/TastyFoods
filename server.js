@@ -2616,6 +2616,10 @@ app.post('/api/orders/:id/status', requireManagementAuth, async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Order not found' });
     }
+    if (status === 'cancelled' && ['cancelled', 'delivered'].includes(order.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Completed or cancelled orders cannot be cancelled' });
+    }
 
     await client.query(
       'UPDATE orders SET status = $1, updated_at = $2 WHERE id = $3 AND restaurant_id = $4',

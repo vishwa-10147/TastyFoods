@@ -1858,7 +1858,7 @@
           <div class="order-amount">${money(o.total)}</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
             <div class="order-eta">${eta(o)}</div>
-            ${o.status !== 'cancelled' ? `<button class="btn-danger" onclick="cancelOrder(${Number(o.id)})">Cancel</button>` : ''}
+            ${!['cancelled', 'delivered'].includes(o.status) ? `<button class="btn-danger" onclick="cancelOrder(${Number(o.id)})">Cancel</button>` : ''}
           </div>
         </div>
       </div>
@@ -2499,6 +2499,17 @@
       await api(`/api/orders/${id}/status`,'POST',{status});
       await fetchState();
     } catch(e) { alert(e.message); }
+  }
+
+  async function cancelOrder(id) {
+    const order = (state.orders || []).find((item) => Number(item.id) === Number(id));
+    if (!order) { alert('Order not found.'); return; }
+    if (['cancelled', 'delivered'].includes(String(order.status))) {
+      alert('Completed or cancelled orders cannot be cancelled.');
+      return;
+    }
+    if (!confirm(`Cancel order ${order.label || `#${id}`}?`)) return;
+    await changeStatus(id, 'cancelled');
   }
 
   // ── TRACKING ─────────────────────────────────────────────
