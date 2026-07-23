@@ -1199,6 +1199,7 @@
               <div class="otype-label">Order Type</div>
               <div class="otype-tabs">
                 <div class="otype-tab active" onclick="setOrderType(this,'dine')">🪑 Dine-in</div>
+                <div class="otype-tab" onclick="setOrderType(this,'takeaway')">🥡 Takeaway (+₹10)</div>
               </div>
             </div>
 
@@ -1740,7 +1741,7 @@
 
   // ── ORDER TYPE ───────────────────────────────────────────
   function applyOrderTypeUI(type) {
-const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
+    const t = ['dine', 'takeaway'].includes(String(type)) ? String(type) : 'dine';
       orderType = t;
       document.querySelectorAll('.otype-tab').forEach(tab => {
         const match = (tab.getAttribute('onclick') || '').match(/'([a-z]+)'/);
@@ -1785,7 +1786,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function getScheduleText() {
-    if (!['takeaway','preorder'].includes(orderType)) return '';
+    if (orderType !== 'preorder') return '';
     const d = String(document.getElementById('schedule-date').value || '').trim();
     const t = String(document.getElementById('schedule-time').value || '').trim();
     return d && t ? `Scheduled for ${d} ${t}` : '';
@@ -2199,7 +2200,9 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
   }
 
   function parcelChargeForType(type = orderType) {
-    return String(type) === 'takeaway' ? PARCEL_CHARGE_AMOUNT : 0;
+    if (String(type) !== 'takeaway') return 0;
+    const outlets = new Set(cart.map((item) => String(item.restaurantCode || selectedRestaurantCode)));
+    return PARCEL_CHARGE_AMOUNT * Math.max(1, outlets.size);
   }
 
   function totalsHTML() {
@@ -2364,7 +2367,7 @@ const t = ['dine'].includes(String(type)) ? String(type) : 'dine';
     if (!customerName || !customerMobile) { alert('Please enter your name and mobile number.'); return; }
     saveCustomerProfile();
     const schedText = getScheduleText();
-    if (['takeaway','preorder'].includes(orderType) && !schedText) { alert('Please select schedule date & time.'); return; }
+    if (orderType === 'preorder' && !schedText) { alert('Please select schedule date & time.'); return; }
 
     for (const group of groups) {
       const restaurantMeta = restaurants.find(r => String(r.code) === String(group.restaurantCode)) || null;
