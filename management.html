@@ -669,8 +669,7 @@
     .manual-category-sidebar {
       border-right: 1px solid var(--border);
       background: var(--bg3);
-      overflow: auto;
-      max-height: calc(100dvh - 320px);
+      overflow-y: visible;
     }
     .manual-items-panel {
       min-width: 0;
@@ -908,15 +907,7 @@
           <div class="auth-note" id="register-note"></div>
         </div>
       </div>
-      <div class="auth-card">
-        <div class="auth-list-head">
-          <div class="auth-list-title">Available restaurants</div>
-          <button class="auth-list-refresh" onclick="loadAvailableRestaurants()">Refresh</button>
-        </div>
-        <div class="restaurant-list" id="available-restaurants">
-          <div class="restaurant-empty">Loading restaurants...</div>
-        </div>
-      </div>
+
     </div>
   </div>
 </div>
@@ -930,7 +921,11 @@
     </div>
     <nav class="nav">
       <div class="nav-section-label">Operations</div>
-      <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard',this)">
+      <div class="nav-item active" data-view="manual" onclick="switchView('manual',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11h6"/><path d="M9 15h6"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M14 3v5h5"/></svg>
+        Manual Order
+      </div>
+      <div class="nav-item" data-view="dashboard" onclick="switchView('dashboard',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Dashboard
       </div>
@@ -938,10 +933,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 6M18 6a2 2 0 110 4H6a2 2 0 110-4"/><path d="M9 10v8M15 10v8"/><path d="M3 18h18"/></svg>
         Kitchen
         <span class="nav-badge" id="k-badge">0</span>
-      </div>
-      <div class="nav-item" data-view="manual" onclick="switchView('manual',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11h6"/><path d="M9 15h6"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M14 3v5h5"/></svg>
-        Manual Order
       </div>
       <div class="nav-item" data-view="tracking" onclick="switchView('tracking',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -978,7 +969,7 @@
     </div>
 
     <!-- ── DASHBOARD ─────────────────────────────────────── -->
-    <section class="content active" id="view-dashboard">
+    <section class="content" id="view-dashboard">
       <div class="content-inner">
         <!-- Metrics -->
         <div class="metrics-grid">
@@ -1117,7 +1108,7 @@
     </section>
 
     <!-- ── KITCHEN ─────────────────────────────────────────── -->
-    <section class="content" id="view-manual">
+    <section class="content active" id="view-manual">
       <div class="content-inner">
         <div class="menu-layout">
           <div>
@@ -1125,8 +1116,6 @@
               <div class="card-head"><div class="card-title">Manual Counter Order</div></div>
               <div class="card-body">
                 <div class="menu-form-grid">
-                  <input class="inp" id="manual-customer-name" placeholder="Customer name (optional)" />
-                  <input class="inp" id="manual-customer-mobile" placeholder="Mobile (optional)" />
                   <input type="hidden" id="manual-order-type" value="takeaway" />
                   <input class="inp" id="manual-table-number" type="number" min="1" placeholder="Table no. (optional)" />
                   <select class="inp" id="manual-payment-method">
@@ -1153,12 +1142,12 @@
             </div>
           </div>
           <div>
+            <div class="manual-type-tabs" style="margin-bottom:12px;">
+              <button class="manual-type-tab active" data-manual-type="takeaway" onclick="setManualOrderType('takeaway')">Takeaway</button>
+              <button class="manual-type-tab" data-manual-type="dine" onclick="setManualOrderType('dine')">Dine In</button>
+            </div>
             <div class="card" style="position:sticky;top:22px;">
               <div class="card-head"><div class="card-title">Bill Preview</div></div>
-              <div class="manual-type-tabs">
-                <button class="manual-type-tab active" data-manual-type="takeaway" onclick="setManualOrderType('takeaway')">Takeaway</button>
-                <button class="manual-type-tab" data-manual-type="dine" onclick="setManualOrderType('dine')">Dine In</button>
-              </div>
               <div id="manual-order-preview"></div>
             </div>
           </div>
@@ -1621,6 +1610,9 @@
     document.getElementById('app').classList.add('visible');
     document.getElementById('rest-chip').textContent = isAdminSession() ? 'Admin: All Restaurants' : (managementAuth?.restaurant?.name || 'Restaurant');
     applyAdminUiMode();
+    if (!isAdminSession()) {
+      switchView('manual', document.querySelector('.nav-item[data-view="manual"]'));
+    }
   }
 
   function applyAdminUiMode() {
@@ -2202,12 +2194,17 @@
     preview.innerHTML = `
       <div style="padding:14px 16px;">
         ${lines.length ? lines.map(line => `
-          <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-            <div>
-              <div style="font-weight:700;">${esc(line.item.name)}</div>
-              <div style="font-size:11px;color:var(--text3);">${line.qty} x ${money(line.item.price)}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(line.item.name)}</div>
+              <div style="font-size:11px;color:var(--text3);">${money(line.item.price)} each</div>
             </div>
-            <div style="font-weight:800;">${money(Number(line.item.price || 0) * line.qty)}</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <button class="op-qty-btn" onclick="updateManualQty(${line.item.id},-1)">-</button>
+              <div class="op-qty-val">${line.qty}</div>
+              <button class="op-qty-btn" onclick="updateManualQty(${line.item.id},1)">+</button>
+              <div style="font-weight:800;min-width:48px;text-align:right;">${money(Number(line.item.price || 0) * line.qty)}</div>
+            </div>
           </div>
         `).join('') : '<div style="font-size:12px;color:var(--text3);padding:8px 0;">Add items to generate a bill.</div>'}
         <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:grid;gap:7px;">
@@ -2241,8 +2238,8 @@
       orderType,
       tableNumber: orderType === 'dine' ? tableNumber : null,
       notes: document.getElementById('manual-notes')?.value.trim() || 'Manual counter order',
-      customerName: document.getElementById('manual-customer-name')?.value.trim() || null,
-      customerMobile: document.getElementById('manual-customer-mobile')?.value.trim() || null,
+      customerName: null,
+      customerMobile: null,
       items: lines.map(line => ({ menuItemId: Number(line.item.id), qty: line.qty })),
       paid: true,
       paymentMethod
