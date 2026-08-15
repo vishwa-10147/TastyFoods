@@ -1154,119 +1154,150 @@
       .order-layout { flex-direction: column; }
       .cart-col { display: none; width: 100%; position: static; }
       .pay-layout { grid-template-columns: 1fr; }
-      .section-inner { width: 100%; max-width: 100%; padding: 12px 14px 96px; overflow-x: hidden; }
-      .topbar { padding: 0 16px; height: 56px; }
-      .page-title { font-size: 18px; }
-      .resto-name { font-size: 28px; }
-      .menu-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-      .field-row { grid-template-columns: 1fr; }
-      .topbar > div:last-child { gap: 8px; font-size: 13px; flex-shrink: 0; }
-      .live-dot { padding: 5px 10px; font-size: 12px; }
-      .resto-hero, .customer-card, .schedule-card, .delivery-card { border-radius: 18px; margin-bottom: 14px; }
-      .resto-hero-body { padding: 16px; }
-      .resto-row { gap: 6px; }
-      .resto-badge { font-size: 11px; padding: 4px 8px; }
-      .customer-card { padding: 14px; }
-      .card-title { margin-bottom: 10px; }
-      .field-inp { width: 100%; min-width: 0; font-size: 16px; padding: 12px 14px; }
-      .otype-wrap { margin-bottom: 14px; }
-      .otype-tabs {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-      .otype-tab {
-        width: 100%;
-        min-width: 0;
-        padding: 12px 8px;
-        border-radius: 14px;
-        font-size: 13px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .cat-scroll-wrap {
-        width: calc(100vw - 28px);
-        margin-left: 0;
-        margin-bottom: 14px;
-        overflow-x: auto;
-      }
-      .cat-tabs { width: max-content; max-width: none; padding-right: 8px; }
-      .cat-btn { padding: 9px 15px; font-size: 13px; }
-    }
-    @media (max-width: 500px) {
-      .topbar { padding: 0 14px; }
-      .page-title { font-size: 24px; }
-      .section-inner { padding: 10px 14px 92px; }
-      .resto-hero { display: none; }
-      .customer-card {
-        padding: 12px;
-        margin-bottom: 16px;
-        border-radius: 16px;
-        background: rgba(255,255,255,0.98);
-      }
-      .customer-card .card-title {
-        display: none;
-      }
-      .field-group {
-        gap: 8px;
-      }
-      .field-lbl {
-        font-size: 11px;
-        color: rgba(26,19,16,0.7);
-      }
-      .field-inp {
-        font-size: 15px;
-        padding: 12px 14px;
-      }
-      .otype-label { margin-bottom: 8px; }
-      .restaurant-list-title { color: #d85a30; }
+      .section-inner { width: 100%; max-width: 100%; padding: 10px 12px 110px; overflow-x: hidden; }
+      .topbar { padding: 0 16px; height: 52px; }
+      .page-title { font-size: 17px; }
+      .resto-name { font-size: 26px; }
+      .menu-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+      .field-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .topbar > div:last-child { gap: 8px; flex-shrink: 0; }
+      .live-dot { padding: 4px 9px; font-size: 11px; }
+      #clock { display: none; }
+      .resto-hero, .customer-card, .schedule-card, .delivery-card { border-radius: 14px; margin-bottom: 10px; }
+      .resto-hero-body { padding: 14px; }
+      .resto-row { gap: 5px; flex-wrap: wrap; }
+      .resto-badge { font-size: 10px; padding: 3px 7px; }
+      .customer-card { padding: 12px 14px; }
+      .card-title { margin-bottom: 8px; font-size: 11px; }
+      .field-inp { width: 100%; min-width: 0; font-size: 15px; padding: 10px 12px; }
+      .otype-wrap { margin-bottom: 10px; }
+      .otype-label { font-size: 10px; margin-bottom: 6px; }
+      .otype-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .otype-tab { width: 100%; min-width: 0; padding: 10px 6px; border-radius: 12px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .cat-scroll-wrap { width: 100%; margin-left: 0; margin-bottom: 12px; overflow-x: auto; box-sizing: border-box; }
+      .cat-tabs { width: max-content; max-width: none; padding-right: 12px; }
+      .cat-btn { padding: 7px 13px; font-size: 12px; }
+      .menu-search-wrap { margin-bottom: 10px; }
+      .menu-search-inp { font-size: 15px; }
+
+      /* Mobile restaurant panel — horizontal chip scroll instead of stacked cards */
       .mobile-restaurant-panel {
-        padding: 10px 12px 14px;
-        background: #fff;
-        border-bottom: 1px solid rgba(216, 90, 48, 0.12);
+        padding: 10px 0 10px;
+        background: var(--white);
+        border-bottom: 1px solid var(--border);
+        position: sticky; top: 52px; z-index: 45;
+      }
+      .mobile-restaurant-panel .restaurant-list-title {
+        color: var(--ink-l); padding: 0 14px; margin-bottom: 8px; font-size: 10px;
       }
       .mobile-restaurant-panel .restaurant-list {
-        gap: 12px;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 2px 14px 6px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        max-height: none;
       }
-      .otype-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .otype-tab { font-size: 14px; padding: 13px 8px; }
-      .menu-search-wrap { margin-bottom: 12px; }
-      .menu-search-inp { font-size: 16px; padding: 12px 42px 12px 44px; }
-      .search-dropdown { max-height: min(420px, 70dvh); }
-      .search-result-item { padding: 10px 12px; gap: 10px; }
-      .search-result-price { font-size: 16px; }
-      .menu-grid { grid-template-columns: 1fr; gap: 14px; }
-      .menu-card {
-        width: 100%;
-        max-width: 100%;
-        border-radius: 18px;
-        box-shadow: 0 8px 28px rgba(26,19,16,0.08);
+      .mobile-restaurant-panel .restaurant-list::-webkit-scrollbar { display: none; }
+      .mobile-restaurant-panel .restaurant-card {
+        flex-shrink: 0;
+        width: auto;
+        min-width: 130px;
+        max-width: 200px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: var(--cream);
+        border: 1.5px solid var(--border);
+        box-shadow: none;
       }
+      .mobile-restaurant-panel .restaurant-card.active {
+        background: var(--clay-l);
+        border-color: var(--clay-m);
+        box-shadow: 0 4px 12px rgba(232,96,58,0.12);
+      }
+      .mobile-restaurant-panel .restaurant-name {
+        color: var(--ink); font-size: 12px; font-weight: 700; margin-bottom: 2px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .mobile-restaurant-panel .restaurant-card.active .restaurant-name { color: var(--clay-d); }
+      .mobile-restaurant-panel .restaurant-meta { display: none; }
+      .mobile-restaurant-panel .restaurant-badge {
+        font-size: 9px; padding: 2px 6px;
+        background: transparent; color: var(--ink-l);
+      }
+      .mobile-restaurant-panel .restaurant-badge.open { color: var(--sage); }
+      .mobile-restaurant-panel .restaurant-badge.closed { color: #dc2626; }
+      #expand-restaurants-btn { display: none !important; }
+    }
+
+    @media (max-width: 500px) {
+      .topbar { padding: 0 12px; height: 50px; }
+      .page-title { font-size: 16px; }
+      .section-inner { padding: 8px 12px 110px; }
+      .resto-hero { display: none; }
+
+      /* Customer card — two fields side by side, compact */
+      .customer-card {
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        border-radius: 14px;
+        background: var(--white);
+        box-shadow: 0 2px 10px rgba(26,19,16,0.06);
+      }
+      .customer-card .card-title { display: none; }
+      .field-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .field-group { gap: 4px; }
+      .field-lbl { font-size: 10px; color: var(--ink-l); }
+      .field-inp { font-size: 14px; padding: 9px 10px; border-radius: 10px; }
+
+      /* Order type — compact */
+      .otype-wrap { margin-bottom: 8px; }
+      .otype-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+      .otype-tab { font-size: 13px; padding: 10px 6px; border-radius: 12px; }
+
+      /* Menu search */
+      .menu-search-wrap { margin-bottom: 10px; }
+      .menu-search-inp { font-size: 15px; padding: 11px 40px 11px 42px; }
+      .search-dropdown { max-height: min(380px, 65dvh); }
+      .search-result-item { padding: 9px 12px; gap: 9px; }
+      .search-result-img, .search-result-emoji { width: 44px; height: 44px; }
+      .search-result-name { font-size: 14px; }
+      .search-result-price { font-size: 15px; }
+
+      /* Menu grid — single col on small phones */
+      .menu-grid { grid-template-columns: 1fr; gap: 12px; }
+      .menu-card { width: 100%; max-width: 100%; border-radius: 16px; box-shadow: 0 4px 18px rgba(26,19,16,0.07); }
       .menu-card:hover { transform: none; }
-      .menu-img-wrap { height: 168px; }
-      .menu-body { padding: 14px 16px 16px; }
-      .menu-name {
-        font-size: 22px;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        line-height: 1.15;
-      }
-      .menu-desc {
-        font-size: 13px;
-        min-height: 0;
-        margin-bottom: 18px;
-      }
-      .menu-foot { min-height: 38px; }
-      .menu-price { font-size: 24px; }
-      .qty-btn { width: 34px; height: 34px; font-size: 18px; }
-      .placeholder-emoji { width: 64px; height: 64px; font-size: 34px; }
-      .placeholder-lbl { font-size: 11px; }
-      .global-warn { max-width: calc(100vw - 28px); white-space: normal; text-align: center; }
+      .menu-img-wrap { height: 150px; }
+      .menu-body { padding: 12px 14px 14px; }
+      .menu-name { font-size: 18px; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+      .menu-desc { font-size: 12px; min-height: 0; margin-bottom: 12px; -webkit-line-clamp: 2; line-clamp: 2; }
+      .menu-foot { min-height: 36px; }
+      .menu-price { font-size: 20px; }
+      .qty-btn { width: 32px; height: 32px; font-size: 16px; }
+      .qty-val { font-size: 14px; }
+      .placeholder-emoji { width: 56px; height: 56px; font-size: 28px; }
+      .placeholder-lbl { font-size: 10px; }
+
+      /* Global toast */
+      .global-warn { max-width: calc(100vw - 28px); white-space: normal; text-align: center; font-size: 12px; }
+
+      /* Payment view */
+      .pay-card { padding: 16px; }
+      .pay-title { font-size: 18px; margin-bottom: 14px; }
     }
-    @media (max-width: 350px) {
+
+    @media (max-width: 380px) {
+      .field-row { grid-template-columns: 1fr; }
       .menu-grid { grid-template-columns: 1fr; }
+      .otype-tabs { gap: 6px; }
+      .otype-tab { font-size: 12px; padding: 9px 4px; }
+      .menu-img-wrap { height: 130px; }
     }
+
   </style>
 </head>
 <body>
