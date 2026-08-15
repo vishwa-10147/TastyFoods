@@ -1052,24 +1052,50 @@
     .mpop-all-btn.active { background: var(--clay); border-color: var(--clay); }
 
     /* ── MENU BUTTON in topbar ────────────────────────────── */
-    .menu-popup-btn {
-      display: flex; align-items: center; gap: 7px;
-      padding: 8px 16px; border-radius: 99px;
-      border: 1.5px solid var(--border);
-      background: var(--white); color: var(--ink-m);
-      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-      cursor: pointer; transition: all 0.2s; white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(26,19,16,0.07);
+    /* ── MENU FAB (bottom-left floating button) ───────────── */
+    #menu-fab {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 24px);
+      left: 24px;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 99px;
+      border: none;
+      background: var(--ink);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 28px rgba(26,19,16,0.28);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s;
+      white-space: nowrap;
     }
-    .menu-popup-btn:hover { border-color: var(--clay-m); color: var(--clay-d); background: var(--clay-l); }
-    .menu-popup-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .menu-popup-btn .mpb-cat-dot {
+    #menu-fab:hover {
+      background: var(--clay);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(232,96,58,0.35);
+    }
+    #menu-fab svg { width: 18px; height: 18px; flex-shrink: 0; }
+    #menu-fab .mpb-cat-dot {
       background: var(--clay); color: white;
-      font-size: 9px; font-weight: 700;
-      padding: 1px 6px; border-radius: 99px; margin-left: 2px;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 99px;
       display: none;
+      border: 1.5px solid rgba(255,255,255,0.3);
     }
-    .menu-popup-btn .mpb-cat-dot.visible { display: inline-block; }
+    #menu-fab .mpb-cat-dot.visible { display: inline-block; }
+    @media (max-width: 900px) {
+      #menu-fab {
+        bottom: calc(env(safe-area-inset-bottom) + 76px);
+        left: 16px;
+        padding: 11px 18px;
+        font-size: 13px;
+      }
+    }
 
     /* ── RESPONSIVE ──────────────────────────────────── */
     @media (max-width: 900px) {
@@ -1265,12 +1291,7 @@
       <div class="topbar-left">
         <div class="page-title" id="page-title">Place Order</div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button class="menu-popup-btn" id="menu-popup-btn" onclick="openMenuPopup()" title="Browse menu categories">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
-          Menu
-          <span class="mpb-cat-dot" id="mpb-cat-dot"></span>
-        </button>
+      <div style="display:flex;align-items:center;gap:12px;">
         <div class="live-dot" id="live-status-dot">Live</div>
         <div id="clock"></div>
       </div>
@@ -1461,6 +1482,13 @@
     </section>
   </main>
 </div>
+
+<!-- Menu FAB (bottom-left) -->
+<button id="menu-fab" onclick="openMenuPopup()" title="Browse menu categories">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+  Menu
+  <span class="mpb-cat-dot" id="mpb-cat-dot"></span>
+</button>
 
 <!-- Mobile Cart FAB -->
 <div id="mobile-cart-fab" style="display:none;">
@@ -1777,8 +1805,8 @@
     try { history.pushState({ view: v }, '', `#${v}`); } catch {}
     if (v === 'tracking') renderTracking();
     if (v === 'payment') renderPayment();
-    // Show menu button only on order view
-    const menuBtn = document.getElementById('menu-popup-btn');
+    // Show menu FAB only on order view
+    const menuBtn = document.getElementById('menu-fab');
     if (menuBtn) menuBtn.style.display = v === 'order' ? '' : 'none';
     closeMenuPopup();
   }
