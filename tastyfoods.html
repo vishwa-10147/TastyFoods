@@ -1052,49 +1052,94 @@
     .mpop-all-btn.active { background: var(--clay); border-color: var(--clay); }
 
     /* ── MENU BUTTON in topbar ────────────────────────────── */
-    /* ── MENU FAB (bottom-left floating button) ───────────── */
+    /* ── MENU FAB ─ Swiggy-style floating icon ─────────────── */
     #menu-fab {
       position: fixed;
-      bottom: calc(env(safe-area-inset-bottom) + 24px);
+      bottom: calc(env(safe-area-inset-bottom) + 28px);
       left: 24px;
       z-index: 90;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: var(--white);
+      color: var(--ink);
+      cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 12px 20px;
-      border-radius: 99px;
-      border: none;
-      background: var(--ink);
-      color: var(--white);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 8px 28px rgba(26,19,16,0.28);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s;
-      white-space: nowrap;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(26,19,16,0.18), 0 1px 4px rgba(26,19,16,0.1);
+      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease;
+      -webkit-tap-highlight-color: transparent;
+      overflow: visible;
+    }
+    #menu-fab::before {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 2.5px solid var(--border);
+      transition: border-color 0.2s;
     }
     #menu-fab:hover {
+      transform: scale(1.1);
+      box-shadow: 0 8px 28px rgba(26,19,16,0.22), 0 2px 8px rgba(26,19,16,0.12);
+    }
+    #menu-fab:hover::before { border-color: var(--clay-m); }
+    #menu-fab:active { transform: scale(0.93); }
+    #menu-fab svg { width: 22px; height: 22px; flex-shrink: 0; transition: color 0.2s; }
+    #menu-fab.filtered {
       background: var(--clay);
-      transform: translateY(-2px);
-      box-shadow: 0 12px 36px rgba(232,96,58,0.35);
+      color: var(--white);
     }
-    #menu-fab svg { width: 18px; height: 18px; flex-shrink: 0; }
-    #menu-fab .mpb-cat-dot {
-      background: var(--clay); color: white;
-      font-size: 10px; font-weight: 700;
-      padding: 2px 8px; border-radius: 99px;
+    #menu-fab.filtered::before { border-color: var(--clay-d); }
+    /* active-category badge on the FAB */
+    #menu-fab-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 99px;
+      background: var(--clay);
+      color: white;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      padding: 0 5px;
       display: none;
-      border: 1.5px solid rgba(255,255,255,0.3);
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--white);
+      animation: badgePop 0.25s cubic-bezier(0.34,1.56,0.64,1) both;
+      text-transform: capitalize;
     }
-    #menu-fab .mpb-cat-dot.visible { display: inline-block; }
+    #menu-fab-badge.visible { display: flex; }
+    @keyframes badgePop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    /* ripple on tap */
+    #menu-fab .fab-ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(26,19,16,0.12);
+      transform: scale(0);
+      animation: fabRipple 0.5s ease-out;
+      pointer-events: none;
+    }
+    @keyframes fabRipple {
+      to { transform: scale(3); opacity: 0; }
+    }
     @media (max-width: 900px) {
       #menu-fab {
-        bottom: calc(env(safe-area-inset-bottom) + 76px);
-        left: 16px;
-        padding: 11px 18px;
-        font-size: 13px;
+        bottom: calc(env(safe-area-inset-bottom) + 82px);
+        left: 18px;
+        width: 52px;
+        height: 52px;
       }
+      #menu-fab svg { width: 20px; height: 20px; }
     }
 
     /* ── RESPONSIVE ──────────────────────────────────── */
@@ -1260,7 +1305,7 @@
     <div class="logo-area">
       <div class="logo-mark">
         <div class="logo-icon" style="width:50px;height:50px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;"><img src="data/logo_tastytables.jpeg" alt="Restaurant Logo" style="width:100%;height:100%;object-fit:contain;border-radius:50%;"></div>
-        <div class="logo-text">Tasty Food</div>
+        <div class="logo-text">Tasty Tables</div>
       </div>
       <div class="logo-sub">Fresh food, fast orders</div>
     </div>
@@ -1483,11 +1528,15 @@
   </main>
 </div>
 
-<!-- Menu FAB (bottom-left) -->
-<button id="menu-fab" onclick="openMenuPopup()" title="Browse menu categories">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
-  Menu
-  <span class="mpb-cat-dot" id="mpb-cat-dot"></span>
+<!-- Menu FAB (bottom-left circular icon) -->
+<button id="menu-fab" onclick="openMenuPopup(event)" title="Browse menu categories" aria-label="Browse menu categories">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="3" y1="5" x2="21" y2="5"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+    <line x1="3" y1="15" x2="21" y2="15"/>
+    <line x1="3" y1="20" x2="13" y2="20"/>
+  </svg>
+  <span id="menu-fab-badge"></span>
 </button>
 
 <!-- Mobile Cart FAB -->
@@ -2058,7 +2107,17 @@
   }
 
   // ── MENU CATEGORY POPUP ──────────────────────────────────
-  function openMenuPopup() {
+  function openMenuPopup(e) {
+    // ripple effect
+    const fab = document.getElementById('menu-fab');
+    if (fab && e) {
+      const r = document.createElement('span');
+      r.className = 'fab-ripple';
+      const size = fab.offsetWidth;
+      r.style.cssText = `width:${size}px;height:${size}px;left:0;top:0;`;
+      fab.appendChild(r);
+      setTimeout(() => r.remove(), 600);
+    }
     renderMenuPopup();
     document.getElementById('menu-popup-overlay').classList.add('open');
     document.getElementById('menu-popup-sheet').classList.add('open');
@@ -2142,13 +2201,16 @@
   }
 
   function updateMenuBtnDot() {
-    const dot = document.getElementById('mpb-cat-dot');
-    if (!dot) return;
+    const badge = document.getElementById('menu-fab-badge');
+    const fab = document.getElementById('menu-fab');
     const isFiltered = currentCat && currentCat !== 'all';
-    dot.classList.toggle('visible', isFiltered);
-    if (isFiltered) {
-      dot.textContent = currentCat.charAt(0).toUpperCase() + currentCat.slice(1);
+    if (badge) {
+      badge.classList.toggle('visible', isFiltered);
+      if (isFiltered) {
+        badge.textContent = currentCat.charAt(0).toUpperCase() + currentCat.slice(1);
+      }
     }
+    if (fab) fab.classList.toggle('filtered', isFiltered);
   }
 
   // ── MENU ─────────────────────────────────────────────────
