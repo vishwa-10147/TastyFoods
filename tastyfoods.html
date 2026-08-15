@@ -965,6 +965,112 @@
     }
     .unlock-popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
+    /* ── MENU POPUP (category sheet) ─────────────────────── */
+    #menu-popup-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 250;
+      background: rgba(26,19,16,0.45);
+      backdrop-filter: blur(4px);
+      animation: fadeInOverlay 0.2s ease;
+    }
+    #menu-popup-overlay.open { display: block; }
+    @keyframes fadeInOverlay {
+      from { opacity: 0; } to { opacity: 1; }
+    }
+    #menu-popup-sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--white);
+      border-radius: 20px 20px 0 0;
+      padding: 0 0 env(safe-area-inset-bottom);
+      z-index: 260;
+      max-height: 78dvh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -8px 48px rgba(26,19,16,0.18);
+    }
+    #menu-popup-sheet.open { transform: translateY(0); }
+    .mpop-drag {
+      width: 40px; height: 4px; background: var(--border);
+      border-radius: 99px; margin: 12px auto 0;
+    }
+    .mpop-header {
+      padding: 14px 22px 10px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .mpop-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px; font-weight: 700; color: var(--ink);
+    }
+    .mpop-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--paper); border: 1px solid var(--border);
+      color: var(--ink-m); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .mpop-close:hover { background: var(--clay); color: white; border-color: var(--clay); }
+    .mpop-restaurant-name {
+      padding: 10px 22px 0;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; color: var(--clay);
+    }
+    .mpop-cats {
+      padding: 12px 16px 20px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .mpop-cat-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      background: var(--cream);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600; color: var(--ink-m);
+      transition: all 0.2s; text-align: left; gap: 10px;
+    }
+    .mpop-cat-btn:hover { border-color: var(--clay-m); color: var(--clay-d); background: var(--clay-l); }
+    .mpop-cat-btn.active {
+      background: var(--clay); color: white;
+      border-color: var(--clay);
+      box-shadow: 0 4px 14px rgba(232,96,58,0.28);
+    }
+    .mpop-cat-icon { font-size: 18px; flex-shrink: 0; }
+    .mpop-cat-info { flex: 1; min-width: 0; }
+    .mpop-cat-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mpop-cat-count { font-size: 11px; font-weight: 500; opacity: 0.7; margin-top: 2px; }
+    .mpop-all-btn {
+      grid-column: 1 / -1;
+      background: var(--ink); color: white; border-color: var(--ink);
+    }
+    .mpop-all-btn:hover { background: #2a1f1c; border-color: #2a1f1c; color: white; }
+    .mpop-all-btn.active { background: var(--clay); border-color: var(--clay); }
+
+    /* ── MENU BUTTON in topbar ────────────────────────────── */
+    .menu-popup-btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 8px 16px; border-radius: 99px;
+      border: 1.5px solid var(--border);
+      background: var(--white); color: var(--ink-m);
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(26,19,16,0.07);
+    }
+    .menu-popup-btn:hover { border-color: var(--clay-m); color: var(--clay-d); background: var(--clay-l); }
+    .menu-popup-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .menu-popup-btn .mpb-cat-dot {
+      background: var(--clay); color: white;
+      font-size: 9px; font-weight: 700;
+      padding: 1px 6px; border-radius: 99px; margin-left: 2px;
+      display: none;
+    }
+    .menu-popup-btn .mpb-cat-dot.visible { display: inline-block; }
+
     /* ── RESPONSIVE ──────────────────────────────────── */
     @media (max-width: 900px) {
       #sidebar { display: none; }
@@ -1100,6 +1206,18 @@
 <!-- DELIVERY UNLOCK POPUP -->
 <div class="unlock-popup" id="unlock-popup">🏍️ Delivery Unlocked!</div>
 
+<!-- MENU CATEGORY POPUP -->
+<div id="menu-popup-overlay" onclick="closeMenuPopup()"></div>
+<div id="menu-popup-sheet">
+  <div class="mpop-drag"></div>
+  <div class="mpop-header">
+    <div class="mpop-title">Browse Menu</div>
+    <button class="mpop-close" onclick="closeMenuPopup()">×</button>
+  </div>
+  <div class="mpop-restaurant-name" id="mpop-restaurant-name"></div>
+  <div class="mpop-cats" id="mpop-cats"></div>
+</div>
+
 <!-- MOBILE CART SHEET -->
 <div class="mobile-cart-sheet" id="mobile-cart-sheet">
   <div class="mcs-overlay" onclick="closeMobileCart()"></div>
@@ -1147,7 +1265,12 @@
       <div class="topbar-left">
         <div class="page-title" id="page-title">Place Order</div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="menu-popup-btn" id="menu-popup-btn" onclick="openMenuPopup()" title="Browse menu categories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+          Menu
+          <span class="mpb-cat-dot" id="mpb-cat-dot"></span>
+        </button>
         <div class="live-dot" id="live-status-dot">Live</div>
         <div id="clock"></div>
       </div>
@@ -1654,6 +1777,10 @@
     try { history.pushState({ view: v }, '', `#${v}`); } catch {}
     if (v === 'tracking') renderTracking();
     if (v === 'payment') renderPayment();
+    // Show menu button only on order view
+    const menuBtn = document.getElementById('menu-popup-btn');
+    if (menuBtn) menuBtn.style.display = v === 'order' ? '' : 'none';
+    closeMenuPopup();
   }
 
   // ── RESTAURANT ───────────────────────────────────────────
@@ -1899,6 +2026,101 @@
     currentCat = cat;
     renderMenu();
     saveDraft();
+    updateMenuBtnDot();
+  }
+
+  // ── MENU CATEGORY POPUP ──────────────────────────────────
+  function openMenuPopup() {
+    renderMenuPopup();
+    document.getElementById('menu-popup-overlay').classList.add('open');
+    document.getElementById('menu-popup-sheet').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenuPopup() {
+    document.getElementById('menu-popup-overlay').classList.remove('open');
+    document.getElementById('menu-popup-sheet').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function renderMenuPopup() {
+    const catsEl = document.getElementById('mpop-cats');
+    const restNameEl = document.getElementById('mpop-restaurant-name');
+    if (!catsEl) return;
+
+    // Show current restaurant name
+    const rest = selectedRestaurant();
+    if (restNameEl) restNameEl.textContent = rest ? rest.name : '';
+
+    // Build category list from current menu
+    const menu = appState.menu || [];
+    const catMap = {};
+    menu.forEach(m => {
+      const c = String(m.cat || 'other');
+      if (!catMap[c]) catMap[c] = { count: 0, emoji: m.emoji || '🍽️' };
+      catMap[c].count++;
+    });
+    const catKeys = Object.keys(catMap).sort();
+
+    const catEmojis = {
+      breakfast: '🌅', main: '🍛', rice: '🍚', drinks: '🥤',
+      starters: '🥗', snacks: '🥙', desserts: '🍮', breads: '🫓',
+      biryani: '🍱', curries: '🫕', soups: '🍲', salads: '🥗',
+      other: '🍽️'
+    };
+
+    const allActive = currentCat === 'all';
+    catsEl.innerHTML = `
+      <button class="mpop-cat-btn mpop-all-btn ${allActive ? 'active' : ''}" onclick="selectMenuPopupCat('all')">
+        <div class="mpop-cat-info">
+          <div class="mpop-cat-name">All Items</div>
+          <div class="mpop-cat-count">${menu.length} items</div>
+        </div>
+        <div class="mpop-cat-icon">🍽️</div>
+      </button>
+      ${catKeys.map(cat => {
+        const info = catMap[cat];
+        const emoji = catEmojis[cat.toLowerCase()] || info.emoji || '🍽️';
+        const active = currentCat === cat;
+        const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+        return `
+          <button class="mpop-cat-btn ${active ? 'active' : ''}" onclick="selectMenuPopupCat('${cat.replace(/'/g, "\\'")}')">
+            <div class="mpop-cat-info">
+              <div class="mpop-cat-name">${label}</div>
+              <div class="mpop-cat-count">${info.count} item${info.count !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="mpop-cat-icon">${emoji}</div>
+          </button>
+        `;
+      }).join('')}
+    `;
+  }
+
+  function selectMenuPopupCat(cat) {
+    currentCat = cat;
+    // Sync the horizontal cat-tabs strip too
+    document.querySelectorAll('.cat-btn').forEach(c => {
+      const onclick = c.getAttribute('onclick') || '';
+      const match = onclick.match(/'([^']+)'/);
+      c.classList.toggle('active', match?.[1] === cat);
+    });
+    renderMenu();
+    saveDraft();
+    updateMenuBtnDot();
+    closeMenuPopup();
+    // Scroll to menu section smoothly
+    const menuGrid = document.getElementById('menu-search-wrap');
+    if (menuGrid) menuGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateMenuBtnDot() {
+    const dot = document.getElementById('mpb-cat-dot');
+    if (!dot) return;
+    const isFiltered = currentCat && currentCat !== 'all';
+    dot.classList.toggle('visible', isFiltered);
+    if (isFiltered) {
+      dot.textContent = currentCat.charAt(0).toUpperCase() + currentCat.slice(1);
+    }
   }
 
   // ── MENU ─────────────────────────────────────────────────
