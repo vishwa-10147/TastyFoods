@@ -3473,6 +3473,64 @@ app.post('/api/whatsapp/webhook', (req, res) => {
   return res.status(200).json({ received: true });
 });
 
+// ── PUBLIC REVIEW ENDPOINT ────────────────────────────────────────────────────
+app.post('/api/public/review', async (req, res) => {
+  try {
+    const restaurantCode = String(req.body?.restaurantCode || '').trim();
+    const rating = Number(req.body?.rating);
+    const comment = String(req.body?.comment || '').trim().slice(0, 500);
+
+    if (!restaurantCode) return res.status(400).json({ error: 'restaurantCode is required' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'rating must be an integer 1–5' });
+    }
+
+    // Fetch current rating + count
+    const { rows } = await pool.query(
+      `SELECT id, rating, rating_count FROM restaurants WHERE code = $1 LIMIT 1`,
+      [normalizeRestaurantCode(restaurantCode)]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Restaurant not found' });
+
+    const row = rows[0];
+    const currentAvg = Number(row.rating || 4.1);
+
+    // Parse existing count — handles "1.4K+ ratings", "200 ratings", plain number
+    let countStr = String(row.rating_count || '0');
+    let existingCount = 0;
+    const numMatch = countStr.match(/[\d.]+/);
+    if (numMatch) {
+      let n = parseFloat(numMatch[0]);
+      if (countStr.toLowerCase().includes('k')) n = Math.round(n * 1000);
+      existingCount = Math.max(0, Math.round(n));
+    }
+
+    // Compute new running average
+    const newCount = existingCount + 1;
+    const newAvg = Math.round(((currentAvg * existingCount + rating) / newCount) * 10) / 10;
+
+    // Format count for display
+    let newCountStr;
+    if (newCount >= 1000) {
+      newCountStr = `${(newCount / 1000).toFixed(1)}K+ ratings`;
+    } else {
+      newCountStr = `${newCount} rating${newCount !== 1 ? 's' : ''}`;
+    }
+
+    await pool.query(
+      `UPDATE restaurants SET rating = $1, rating_count = $2, updated_at = $3 WHERE id = $4`,
+      [newAvg, newCountStr, Date.now(), row.id]
+    );
+
+    // Broadcast updated state so live sessions see the new rating
+    await broadcastState(row.id);
+
+    return res.json({ ok: true, rating: newAvg, ratingCount: newCountStr });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || 'Failed to submit review' });
+  }
+});
+
 app.use((error, _req, res, _next) => {
   return res.status(500).json({ error: error.message || 'Internal server error' });
 });

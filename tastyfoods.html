@@ -965,6 +965,84 @@
     }
     .unlock-popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
+    /* ── REVIEW SHEET ───────────────────────────────────────── */
+    #review-overlay {
+      display: none; position: fixed; inset: 0; z-index: 280;
+      background: rgba(26,19,16,0.55); backdrop-filter: blur(5px);
+    }
+    #review-overlay.open { display: block; }
+    #review-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 290;
+      background: var(--white); border-radius: 24px 24px 0 0;
+      padding: 0 24px calc(env(safe-area-inset-bottom) + 28px);
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -12px 60px rgba(26,19,16,0.2);
+    }
+    #review-sheet.open { transform: translateY(0); }
+    .rev-drag {
+      width: 44px; height: 4px; background: var(--border);
+      border-radius: 99px; margin: 14px auto 0;
+    }
+    .rev-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 20px 0 6px;
+    }
+    .rev-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.2;
+    }
+    .rev-resto-name {
+      font-size: 13px; font-weight: 600; color: var(--clay);
+      margin-top: 4px; letter-spacing: 0.2px;
+    }
+    .rev-skip {
+      border: none; background: none; cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px; font-weight: 600; color: var(--ink-l);
+      padding: 4px 0; flex-shrink: 0; margin-left: 12px; margin-top: 4px;
+      transition: color 0.2s;
+    }
+    .rev-skip:hover { color: var(--ink); }
+    .rev-stars {
+      display: flex; justify-content: center; gap: 10px;
+      padding: 18px 0 6px;
+    }
+    .rev-star {
+      font-size: 42px; background: none; border: none; cursor: pointer;
+      color: var(--border); transition: color 0.15s, transform 0.15s;
+      line-height: 1; padding: 4px;
+    }
+    .rev-star:hover, .rev-star.lit { color: #f5a623; transform: scale(1.15); }
+    .rev-star.lit { text-shadow: 0 0 12px rgba(245,166,35,0.5); }
+    .rev-labels {
+      display: flex; justify-content: space-between;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+      text-transform: uppercase; color: var(--ink-xl);
+      padding: 0 4px 14px;
+    }
+    .rev-comment {
+      width: 100%; border: 1.5px solid var(--border); border-radius: 12px;
+      padding: 10px 14px; font-family: 'DM Sans', sans-serif;
+      font-size: 14px; color: var(--ink); background: var(--cream);
+      resize: none; outline: none; transition: border-color 0.2s;
+      margin-bottom: 14px;
+    }
+    .rev-comment:focus { border-color: var(--clay); background: white; }
+    .rev-submit {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--clay), var(--clay-d));
+      color: white; border: none; border-radius: 14px;
+      font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.2px;
+    }
+    .rev-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+    .rev-submit:not(:disabled):hover { filter: brightness(1.08); }
+    .rev-progress {
+      text-align: center; font-size: 11px; font-weight: 600;
+      color: var(--ink-xl); margin-top: 10px; letter-spacing: 0.3px;
+    }
+
     /* ── MENU POPUP (category sheet) ─────────────────────── */
     #menu-popup-overlay {
       display: none;
@@ -1414,14 +1492,6 @@
               </div>
             </div>
 
-            <!-- Order Type -->
-            <div class="otype-wrap">
-              <div class="otype-label">Order Type</div>
-              <div class="otype-tabs">
-                <div class="otype-tab active" onclick="setOrderType(this,'dine')">🪑 Dine-in</div>
-                <div class="otype-tab" onclick="setOrderType(this,'takeaway')">🥡 Takeaway</div>
-              </div>
-            </div>
 
             <!-- Table -->
             <div class="table-group" id="table-group">
@@ -1524,6 +1594,16 @@
         <div class="pay-layout">
           <div class="pay-card">
             <div class="pay-title">Payment</div>
+
+            <!-- Order Type (moved from order view) -->
+            <div class="otype-wrap" style="margin-bottom:18px;">
+              <div class="otype-label">Order Type</div>
+              <div class="otype-tabs">
+                <div class="otype-tab active" onclick="setOrderType(this,'dine')">🪑 Dine-in</div>
+                <div class="otype-tab" onclick="setOrderType(this,'takeaway')">🥡 Takeaway</div>
+              </div>
+            </div>
+
             <div class="payment-field-row">
               <label class="field-lbl">Coupon code</label>
               <div class="payment-action-row">
@@ -1557,6 +1637,32 @@
       </div>
     </section>
   </main>
+</div>
+
+<!-- ── REVIEW SHEET ───────────────────────────────────────── -->
+<div id="review-overlay"></div>
+<div id="review-sheet">
+  <div class="rev-drag"></div>
+  <div class="rev-header">
+    <div>
+      <div class="rev-title">How was your experience?</div>
+      <div class="rev-resto-name" id="rev-resto-name"></div>
+    </div>
+    <button class="rev-skip" onclick="skipReview()">Skip</button>
+  </div>
+  <div class="rev-stars" id="rev-stars">
+    <button class="rev-star" data-v="1" onclick="pickStar(1)">★</button>
+    <button class="rev-star" data-v="2" onclick="pickStar(2)">★</button>
+    <button class="rev-star" data-v="3" onclick="pickStar(3)">★</button>
+    <button class="rev-star" data-v="4" onclick="pickStar(4)">★</button>
+    <button class="rev-star" data-v="5" onclick="pickStar(5)">★</button>
+  </div>
+  <div class="rev-labels">
+    <span>Terrible</span><span>Poor</span><span>Okay</span><span>Good</span><span>Excellent</span>
+  </div>
+  <textarea class="rev-comment" id="rev-comment" rows="2" placeholder="Tell us more (optional)…" maxlength="300"></textarea>
+  <button class="rev-submit" id="rev-submit" onclick="submitReview()" disabled>Rate &amp; Continue →</button>
+  <div class="rev-progress" id="rev-progress"></div>
 </div>
 
 <!-- Menu FAB (bottom-left circular icon) -->
@@ -3099,6 +3205,10 @@
             pendingCartSnapshot = null;
             setPendingPayment(0);
             renderPayment(); renderTracking();
+            // Launch post-payment review flow
+            const paidCodes = orders.map(o => String(o.restaurantCode || selectedRestaurantCode)).filter(Boolean);
+            const uniquePaidCodes = [...new Set(paidCodes)];
+            startReviewFlow(uniquePaidCodes);
           } catch (err) { alert(err.message || 'Verification failed'); }
         }
       });
@@ -3106,8 +3216,95 @@
       rzp.open();
     } catch (e) { alert(e.message); }
   }
+  // ── REVIEW FLOW ──────────────────────────────────────────
+  let _reviewQueue = [];   // restaurant codes still to review
+  let _reviewIdx   = 0;    // current index
+  let _reviewStar  = 0;    // currently selected star value
+
+  function startReviewFlow(codes) {
+    if (!codes || !codes.length) return;
+    _reviewQueue = codes;
+    _reviewIdx   = 0;
+    _reviewStar  = 0;
+    _openReviewFor(_reviewIdx);
+  }
+
+  function _openReviewFor(idx) {
+    if (idx >= _reviewQueue.length) { closeReviewSheet(); return; }
+    const code = _reviewQueue[idx];
+    const rest = restaurants.find(r => String(r.code) === String(code));
+    const name = rest ? rest.name : code;
+
+    // Reset UI
+    document.getElementById('rev-resto-name').textContent = name;
+    document.getElementById('rev-comment').value = '';
+    document.getElementById('rev-submit').disabled = true;
+    document.getElementById('rev-progress').textContent =
+      _reviewQueue.length > 1
+        ? `${idx + 1} of ${_reviewQueue.length} restaurants`
+        : '';
+    _reviewStar = 0;
+    document.querySelectorAll('.rev-star').forEach(s => s.classList.remove('lit'));
+
+    // Open sheet
+    document.getElementById('review-overlay').classList.add('open');
+    document.getElementById('review-sheet').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function pickStar(val) {
+    _reviewStar = val;
+    document.querySelectorAll('.rev-star').forEach(s => {
+      s.classList.toggle('lit', Number(s.dataset.v) <= val);
+    });
+    document.getElementById('rev-submit').disabled = false;
+  }
+
+  async function submitReview() {
+    if (!_reviewStar) return;
+    const code    = _reviewQueue[_reviewIdx];
+    const comment = String(document.getElementById('rev-comment').value || '').trim();
+    const btn     = document.getElementById('rev-submit');
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    try {
+      const result = await api('/api/public/review', 'POST', {
+        restaurantCode: code,
+        rating: _reviewStar,
+        comment
+      });
+
+      // Update the local restaurants array + live badge
+      if (result?.ok) {
+        restaurants = restaurants.map(r => {
+          if (String(r.code) !== String(code)) return r;
+          return { ...r, rating: result.rating, ratingCount: result.ratingCount };
+        });
+        renderRestaurantSidebar();
+        renderRestoHero();
+      }
+    } catch (_) { /* silently continue if network fails */ }
+
+    btn.textContent = 'Rate & Continue →';
+    _reviewIdx++;
+    _openReviewFor(_reviewIdx);
+  }
+
+  function skipReview() {
+    _reviewIdx++;
+    _openReviewFor(_reviewIdx);
+  }
+
+  function closeReviewSheet() {
+    document.getElementById('review-overlay').classList.remove('open');
+    document.getElementById('review-sheet').classList.remove('open');
+    document.body.style.overflow = '';
+  }
 
   // ── CLOCK ────────────────────────────────────────────────
+
   function updateClock() {
     const el = document.getElementById('clock');
     if (el) el.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
